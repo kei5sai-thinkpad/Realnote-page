@@ -8,24 +8,148 @@ html = """
 <html>
 <head>
 <meta charset="UTF-8">
-<title>共有ノート</title>
+<title>NoteCord</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: sans-serif;
+    background: #0f172a;
+    color: white;
+    display: flex;
+    height: 100vh;
+}
+
+/* サイドバー */
+.sidebar {
+    width: 220px;
+    background: #020617;
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+.sidebar h2 {
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.room {
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-bottom: 5px;
+}
+
+.room:hover {
+    background: #1e293b;
+}
+
+/* メイン */
+.main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ヘッダー */
+.header {
+    padding: 15px;
+    background: #020617;
+    border-bottom: 1px solid #1e293b;
+}
+
+/* ノート */
+textarea {
+    flex: 1;
+    border: none;
+    padding: 20px;
+    background: #0f172a;
+    color: white;
+    font-size: 16px;
+    resize: none;
+}
+
+textarea:focus {
+    outline: none;
+}
+
+/* 入力 */
+.add-room {
+    display: flex;
+    gap: 5px;
+    margin-top: 10px;
+}
+
+input {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: none;
+    background: #1e293b;
+    color: white;
+}
+
+button {
+    padding: 8px 10px;
+    border: none;
+    border-radius: 8px;
+    background: #3b82f6;
+    color: white;
+    cursor: pointer;
+}
+</style>
 </head>
+
 <body>
 
-<h2>リアルタイム共有ノート</h2>
+<div class="sidebar">
+    <h2>📁 Rooms</h2>
+    <div id="rooms"></div>
 
-<input id="room" placeholder="ルーム名">
-<button onclick="joinRoom()">参加</button>
+    <div class="add-room">
+        <input id="roomInput" placeholder="new room">
+        <button onclick="addRoom()">＋</button>
+    </div>
+</div>
 
-<br><br>
-<textarea id="note" style="width:100%;height:300px;"></textarea>
+<div class="main">
+    <div class="header">
+        <span id="currentRoom">未接続</span>
+    </div>
+
+    <textarea id="note" placeholder="ここに入力..."></textarea>
+</div>
 
 <script>
 let ws;
 let isUpdating = false;
+let rooms = ["general"];
 
-function joinRoom() {
-    const room = document.getElementById("room").value;
+function renderRooms() {
+    const container = document.getElementById("rooms");
+    container.innerHTML = "";
+
+    rooms.forEach(room => {
+        const div = document.createElement("div");
+        div.className = "room";
+        div.innerText = "# " + room;
+        div.onclick = () => joinRoom(room);
+        container.appendChild(div);
+    });
+}
+
+function addRoom() {
+    const input = document.getElementById("roomInput");
+    const name = input.value.trim();
+    if (!name) return;
+
+    rooms.push(name);
+    input.value = "";
+    renderRooms();
+}
+
+function joinRoom(room) {
+    document.getElementById("currentRoom").innerText = "# " + room;
     const note = document.getElementById("note");
 
     if (ws) {
@@ -49,6 +173,8 @@ function joinRoom() {
         }
     };
 }
+
+renderRooms();
 </script>
 
 </body>

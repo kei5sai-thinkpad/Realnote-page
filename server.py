@@ -6,7 +6,12 @@ app = FastAPI()
 html = """
 <!DOCTYPE html>
 <html>
+<head>
+<meta charset="UTF-8">
+<title>共有ノート</title>
+</head>
 <body>
+
 <h2>リアルタイム共有ノート</h2>
 
 <input id="room" placeholder="ルーム名">
@@ -17,10 +22,15 @@ html = """
 
 <script>
 let ws;
+let isUpdating = false;
 
 function joinRoom() {
     const room = document.getElementById("room").value;
     const note = document.getElementById("note");
+
+    if (ws) {
+        ws.close();
+    }
 
     ws = new WebSocket(
         (location.protocol === "https:" ? "wss://" : "ws://")
@@ -28,16 +38,19 @@ function joinRoom() {
     );
 
     ws.onmessage = (event) => {
+        isUpdating = true;
         note.value = event.data;
+        isUpdating = false;
     };
 
     note.oninput = () => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
+        if (ws && ws.readyState === WebSocket.OPEN && !isUpdating) {
             ws.send(note.value);
         }
     };
 }
 </script>
+
 </body>
 </html>
 """
@@ -59,7 +72,6 @@ async def websocket(ws: WebSocket, room: str):
 
     clients[room].append(ws)
 
-    # 初期データ送信
     await ws.send_text(notes[room])
 
     try:
@@ -67,6 +79,7 @@ async def websocket(ws: WebSocket, room: str):
             data = await ws.receive_text()
             notes[room] = data
 
+            # 全員に送信
             for client in clients[room]:
                 await client.send_text(notes[room])
 

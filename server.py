@@ -28,18 +28,12 @@ body {
     box-sizing: border-box;
 }
 
-.sidebar h2 {
-    font-size: 16px;
-    margin-bottom: 10px;
-}
-
 .room {
     padding: 8px;
     border-radius: 8px;
     cursor: pointer;
     margin-bottom: 5px;
 }
-
 .room:hover {
     background: #1e293b;
 }
@@ -51,14 +45,12 @@ body {
     flex-direction: column;
 }
 
-/* ヘッダー */
 .header {
     padding: 15px;
     background: #020617;
     border-bottom: 1px solid #1e293b;
 }
 
-/* ノート */
 textarea {
     flex: 1;
     border: none;
@@ -73,29 +65,18 @@ textarea:focus {
     outline: none;
 }
 
-/* 入力 */
-.add-room {
-    display: flex;
-    gap: 5px;
-    margin-top: 10px;
+.typing {
+    padding: 10px;
+    color: #94a3b8;
 }
 
 input {
-    flex: 1;
+    width: 100%;
     padding: 8px;
     border-radius: 8px;
     border: none;
     background: #1e293b;
     color: white;
-}
-
-button {
-    padding: 8px 10px;
-    border: none;
-    border-radius: 8px;
-    background: #3b82f6;
-    color: white;
-    cursor: pointer;
 }
 </style>
 </head>
@@ -103,26 +84,21 @@ button {
 <body>
 
 <div class="sidebar">
-    <h2>📁 Rooms</h2>
+    <h3>Rooms</h3>
     <div id="rooms"></div>
-
-    <div class="add-room">
-        <input id="roomInput" placeholder="new room">
-        <button onclick="addRoom()">＋</button>
-    </div>
+    <input id="roomInput" placeholder="new room" onkeydown="if(event.key==='Enter') addRoom()">
 </div>
 
 <div class="main">
-    <div class="header">
-        <span id="currentRoom">未接続</span>
-    </div>
-
-    <textarea id="note" placeholder="ここに入力..."></textarea>
+    <div class="header" id="currentRoom">未接続</div>
+    <textarea id="note"></textarea>
+    <div class="typing" id="typing"></div>
 </div>
 
 <script>
 let ws;
 let isUpdating = false;
+let username = "User" + Math.floor(Math.random()*1000);
 let rooms = ["general"];
 
 function renderRooms() {
@@ -142,7 +118,6 @@ function addRoom() {
     const input = document.getElementById("roomInput");
     const name = input.value.trim();
     if (!name) return;
-
     rooms.push(name);
     input.value = "";
     renderRooms();
@@ -152,9 +127,7 @@ function joinRoom(room) {
     document.getElementById("currentRoom").innerText = "# " + room;
     const note = document.getElementById("note");
 
-    if (ws) {
-        ws.close();
-    }
+    if (ws) ws.close();
 
     ws = new WebSocket(
         (location.protocol === "https:" ? "wss://" : "ws://")
@@ -162,14 +135,33 @@ function joinRoom(room) {
     );
 
     ws.onmessage = (event) => {
-        isUpdating = true;
-        note.value = event.data;
-        isUpdating = false;
+        const data = JSON.parse(event.data);
+
+        if (data.type === "init" || data.type === "update") {
+            isUpdating = true;
+            note.value = data.text;
+            isUpdating = false;
+        }
+
+        if (data.type === "typing") {
+            const typingDiv = document.getElementById("typing");
+            typingDiv.innerText = data.user + " が入力中...";
+            setTimeout(() => typingDiv.innerText = "", 1000);
+        }
     };
 
     note.oninput = () => {
         if (ws && ws.readyState === WebSocket.OPEN && !isUpdating) {
-            ws.send(note.value);
+
+            ws.send(JSON.stringify({
+                type: "update",
+                text: note.value
+            }));
+
+            ws.send(JSON.stringify({
+                type: "typing",
+                user: username
+            }));
         }
     };
 }
@@ -198,16 +190,30 @@ async def websocket(ws: WebSocket, room: str):
 
     clients[room].append(ws)
 
-    await ws.send_text(notes[room])
+    await ws.send_json({
+        "type": "init",
+        "text": notes[room]
+    })
 
     try:
         while True:
-            data = await ws.receive_text()
-            notes[room] = data
+            data = await ws.receive_json()
 
-            # 全員に送信
-            for client in clients[room]:
-                await client.send_text(notes[room])
+            if data["type"] == "update":
+                notes[room] = data["text"]
+                for client in clients[room]:
+                    await client.send_json({
+                        "type": "update",
+                        "text": notes[room]
+                    })
+
+            if data["type"] == "typing":
+                for client in clients[room]:
+                    if client != ws:
+                        await client.send_json({
+                            "type": "typing",
+                            "user": data["user"]
+                        })
 
     except:
         clients[room].remove(ws)

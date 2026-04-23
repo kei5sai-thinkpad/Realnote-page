@@ -20,25 +20,19 @@ body {
     height: 100vh;
 }
 
-/* サイドバー */
 .sidebar {
     width: 220px;
     background: #020617;
     padding: 15px;
-    box-sizing: border-box;
 }
 
 .room {
     padding: 8px;
     border-radius: 8px;
     cursor: pointer;
-    margin-bottom: 5px;
 }
-.room:hover {
-    background: #1e293b;
-}
+.room:hover { background: #1e293b; }
 
-/* メイン */
 .main {
     flex: 1;
     display: flex;
@@ -49,6 +43,9 @@ body {
     padding: 15px;
     background: #020617;
     border-bottom: 1px solid #1e293b;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 textarea {
@@ -58,11 +55,6 @@ textarea {
     background: #0f172a;
     color: white;
     font-size: 16px;
-    resize: none;
-}
-
-textarea:focus {
-    outline: none;
 }
 
 .typing {
@@ -70,9 +62,19 @@ textarea:focus {
     color: #94a3b8;
 }
 
+button {
+    background: #3b82f6;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+}
+
 input {
     width: 100%;
     padding: 8px;
+    margin-top: 10px;
     border-radius: 8px;
     border: none;
     background: #1e293b;
@@ -90,10 +92,16 @@ input {
 </div>
 
 <div class="main">
-    <div class="header" id="currentRoom">未接続</div>
+    <div class="header">
+        <span id="currentRoom">未接続</span>
+        <button onclick="downloadPDF()">📄 PDF保存</button>
+    </div>
+
     <textarea id="note"></textarea>
     <div class="typing" id="typing"></div>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
 let ws;
@@ -164,6 +172,22 @@ function joinRoom(room) {
             }));
         }
     };
+}
+
+// PDF保存
+function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const text = document.getElementById("note").value;
+    const room = document.getElementById("currentRoom").innerText;
+
+    const lines = doc.splitTextToSize(text, 180);
+
+    doc.text(lines, 10, 10);
+
+    const date = new Date().toISOString().slice(0,10);
+    doc.save(room + "_" + date + ".pdf");
 }
 
 renderRooms();

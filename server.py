@@ -1,22 +1,27 @@
+# server.py（SQLite完全接続版）
+
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from database import (
+    create_room,
+    get_room,
+    save_note,
+    get_note,
+    get_all_rooms
+)
+
 app = FastAPI()
 
-# ----------------------------
-# データ保存
-# ----------------------------
+# WebSocket接続中ユーザー
 clients = {}
-notes = {}
-room_passwords = {}
-room_types = {}      # shared / readonly
-room_owners = {}     # 作成者 username
 
 
 # ----------------------------
 # HTML
 # ----------------------------
+
 html = """
 <!DOCTYPE html>
 <html lang="ja">
@@ -133,12 +138,9 @@ button:hover {
 
 <script>
 let ws;
-let currentRoom = "";
 let isUpdating = false;
 
-/* ----------------------------
-ユーザー名
----------------------------- */
+/* ユーザー名 */
 
 let username = localStorage.getItem("notecord_username");
 
@@ -153,9 +155,7 @@ if (!username) {
 }
 
 
-/* ----------------------------
-部屋一覧
----------------------------- */
+/* 部屋一覧 */
 
 async function loadRooms() {
     const res = await fetch("/rooms");
@@ -179,9 +179,7 @@ function quickJoin(name) {
 }
 
 
-/* ----------------------------
-入室 / 作成
----------------------------- */
+/* 入室 / 作成 */
 
 async function accessRoom() {
     const room = document.getElementById("roomInput").value.trim();
@@ -219,27 +217,15 @@ async function accessRoom() {
 }
 
 
-/* ----------------------------
-接続
----------------------------- */
+/* 接続 */
 
 function connectRoom(room, canEdit, label) {
-    currentRoom = room;
-
     document.getElementById("currentRoom").innerText = "# " + room;
     document.getElementById("modeLabel").innerText = label;
 
     const note = document.getElementById("note");
 
     note.contentEditable = canEdit ? "true" : "false";
-
-    if (!canEdit) {
-        note.style.opacity = "0.9";
-        note.style.border = "2px solid #334155";
-    } else {
-        note.style.opacity = "1";
-        note.style.border = "none";
-    }
 
     if (ws) ws.close();
 
@@ -311,14 +297,13 @@ async def home():
 
 @app.get("/rooms")
 async def get_rooms():
+    rows = get_all_rooms()
+
     result = []
-
-    for room in room_passwords:
-        t = room_types.get(room, "shared")
-
+    for room_name, room_type in rows:
         result.append({
-            "name": room,
-            "label": "閲覧専用" if t == "readonly" else "共有"
+            "name": room_name,
+            "label": "閲覧専用" if room_type == "readonly" else "共有"
         })
 
     return result
@@ -337,13 +322,16 @@ async def join_room(data: RoomData):
             "message": "部屋名を入力してください"
         }
 
-    # 初回作成
-    if room not in room_passwords:
-        room_passwords[room] = password  # 空文字でも保存
-        room_types[room] = room_type
-        room_owners[room] = username
-        notes[room] = ""
-        clients[room] = []
+    room_data = get_room(room)
+
+    # 新規作成
+    if not room_data:
+        create_room(
+            room=room,
+            password=password,
+            room_type=room_type,
+            owner=username
+        )
 
         return {
             "success": True,
@@ -351,19 +339,16 @@ async def join_room(data: RoomData):
             "label": "作成者"
         }
 
-    saved_password = room_passwords.get(room, "")
+    saved_room, saved_password, saved_type, saved_owner = room_data
 
-    # パスワード付き部屋 → 一致必須
-    if saved_password != "":
-        if saved_password != password:
-            return {
-                "success": False,
-                "message": "パスワードが違います"
-            }
+    if saved_password != "" and saved_password != password:
+        return {
+            "success": False,
+            "message": "パスワードが違います"
+        }
 
-    # パスワードなし部屋 → 誰でも入れる
-    is_owner = room_owners.get(room) == username
-    is_readonly = room_types.get(room) == "readonly"
+    is_owner = saved_owner == username
+    is_readonly = saved_type == "readonly"
 
     can_edit = True
     label = "共有ノート"
@@ -389,14 +374,11 @@ async def websocket(ws: WebSocket, room: str):
     if room not in clients:
         clients[room] = []
 
-    if room not in notes:
-        notes[room] = ""
-
     clients[room].append(ws)
 
     await ws.send_json({
         "type": "init",
-        "text": notes[room]
+        "text": get_note(room)
     })
 
     try:
@@ -404,14 +386,14 @@ async def websocket(ws: WebSocket, room: str):
             data = await ws.receive_json()
 
             if data["type"] == "update":
-                notes[room] = data["text"]
+                save_note(room, data["text"])
 
                 for client in clients[room][:]:
                     if client != ws:
                         try:
                             await client.send_json({
                                 "type": "update",
-                                "text": notes[room]
+                                "text": data["text"]
                             })
                         except:
                             pass

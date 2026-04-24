@@ -21,17 +21,23 @@ body {
 }
 
 .sidebar {
-    width: 220px;
+    width: 240px;
     background: #020617;
     padding: 15px;
+    border-right: 1px solid #1e293b;
 }
 
 .room {
-    padding: 8px;
-    border-radius: 8px;
+    padding: 10px;
+    border-radius: 10px;
     cursor: pointer;
+    margin-bottom: 6px;
+    transition: 0.2s;
 }
-.room:hover { background: #1e293b; }
+
+.room:hover {
+    background: #1e293b;
+}
 
 .main {
     flex: 1;
@@ -40,7 +46,7 @@ body {
 }
 
 .header {
-    padding: 15px;
+    padding: 15px 20px;
     background: #020617;
     border-bottom: 1px solid #1e293b;
     display: flex;
@@ -48,37 +54,58 @@ body {
     align-items: center;
 }
 
+.header-buttons {
+    display: flex;
+    gap: 10px;
+}
+
 textarea {
     flex: 1;
     border: none;
+    outline: none;
+    resize: none;
     padding: 20px;
     background: #0f172a;
     color: white;
     font-size: 16px;
+    line-height: 1.6;
 }
 
 .typing {
-    padding: 10px;
+    padding: 10px 20px;
     color: #94a3b8;
+    min-height: 24px;
 }
 
 button {
     background: #3b82f6;
     border: none;
-    padding: 8px 12px;
-    border-radius: 8px;
+    padding: 10px 14px;
+    border-radius: 10px;
     color: white;
     cursor: pointer;
+    font-weight: bold;
+    transition: 0.2s;
+}
+
+button:hover {
+    background: #2563eb;
 }
 
 input {
     width: 100%;
-    padding: 8px;
-    margin-top: 10px;
-    border-radius: 8px;
+    padding: 10px;
+    margin-top: 12px;
+    border-radius: 10px;
     border: none;
+    outline: none;
     background: #1e293b;
     color: white;
+    box-sizing: border-box;
+}
+
+h3 {
+    margin-top: 0;
 }
 </style>
 </head>
@@ -88,17 +115,29 @@ input {
 <div class="sidebar">
     <h3>Rooms</h3>
     <div id="rooms"></div>
-    <input id="roomInput" placeholder="new room" onkeydown="if(event.key==='Enter') addRoom()">
+
+    <input
+        id="roomInput"
+        placeholder="new room"
+        onkeydown="if(event.key==='Enter') addRoom()"
+    >
 </div>
 
 <div class="main">
+
     <div class="header">
-        <span id="currentRoom">未接続</span>
-        <button onclick="downloadPDF()">📄 PDF保存</button>
+        <span id="currentRoom"># general</span>
+
+        <div class="header-buttons">
+            <button onclick="downloadTXT()">📝 TXT保存</button>
+            <button onclick="downloadPDF()">📄 PDF保存</button>
+        </div>
     </div>
 
-    <textarea id="note"></textarea>
+    <textarea id="note" placeholder="ここにメモを書いてください..."></textarea>
+
     <div class="typing" id="typing"></div>
+
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -106,8 +145,11 @@ input {
 <script>
 let ws;
 let isUpdating = false;
-let username = "User" + Math.floor(Math.random()*1000);
+let username = "User" + Math.floor(Math.random() * 1000);
 let rooms = ["general"];
+
+
+/* ---------- 部屋一覧 ---------- */
 
 function renderRooms() {
     const container = document.getElementById("rooms");
@@ -125,22 +167,39 @@ function renderRooms() {
 function addRoom() {
     const input = document.getElementById("roomInput");
     const name = input.value.trim();
+
     if (!name) return;
+    if (rooms.includes(name)) {
+        alert("その部屋はすでにあります");
+        return;
+    }
+
     rooms.push(name);
     input.value = "";
     renderRooms();
 }
 
+
+/* ---------- 部屋接続 ---------- */
+
 function joinRoom(room) {
     document.getElementById("currentRoom").innerText = "# " + room;
     const note = document.getElementById("note");
 
-    if (ws) ws.close();
+    if (ws) {
+        ws.close();
+    }
 
     ws = new WebSocket(
         (location.protocol === "https:" ? "wss://" : "ws://")
-        + location.host + "/ws/" + room
+        + location.host
+        + "/ws/"
+        + room
     );
+
+    ws.onopen = () => {
+        console.log("connected:", room);
+    };
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -154,13 +213,20 @@ function joinRoom(room) {
         if (data.type === "typing") {
             const typingDiv = document.getElementById("typing");
             typingDiv.innerText = data.user + " が入力中...";
-            setTimeout(() => typingDiv.innerText = "", 1000);
+
+            clearTimeout(window.typingTimer);
+            window.typingTimer = setTimeout(() => {
+                typingDiv.innerText = "";
+            }, 1200);
         }
     };
 
     note.oninput = () => {
-        if (ws && ws.readyState === WebSocket.OPEN && !isUpdating) {
-
+        if (
+            ws &&
+            ws.readyState === WebSocket.OPEN &&
+            !isUpdating
+        ) {
             ws.send(JSON.stringify({
                 type: "update",
                 text: note.value
@@ -174,23 +240,48 @@ function joinRoom(room) {
     };
 }
 
-// PDF保存
+
+/* ---------- TXT保存 ---------- */
+
+function downloadTXT() {
+    const text = document.getElementById("note").value;
+    const room = document.getElementById("currentRoom").innerText.replace("# ", "");
+    const date = new Date().toISOString().slice(0, 10);
+
+    const blob = new Blob([text], {
+        type: "text/plain"
+    });
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = room + "_" + date + ".txt";
+    a.click();
+}
+
+
+/* ---------- PDF保存 ---------- */
+
 function downloadPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    const text = document.getElementById("note").value;
-    const room = document.getElementById("currentRoom").innerText;
+    const text = document.getElementById("note").value || "空のノート";
+    const room = document.getElementById("currentRoom").innerText.replace("# ", "");
+    const date = new Date().toISOString().slice(0, 10);
 
     const lines = doc.splitTextToSize(text, 180);
 
-    doc.text(lines, 10, 10);
+    doc.setFontSize(12);
+    doc.text(lines, 10, 15);
 
-    const date = new Date().toISOString().slice(0,10);
     doc.save(room + "_" + date + ".pdf");
 }
 
+
+/* ---------- 初期化 ---------- */
+
 renderRooms();
+joinRoom("general");
 </script>
 
 </body>
@@ -200,9 +291,11 @@ renderRooms();
 clients = {}
 notes = {}
 
+
 @app.get("/")
 async def get():
     return HTMLResponse(html)
+
 
 @app.websocket("/ws/{room}")
 async def websocket(ws: WebSocket, room: str):
@@ -225,19 +318,27 @@ async def websocket(ws: WebSocket, room: str):
 
             if data["type"] == "update":
                 notes[room] = data["text"]
-                for client in clients[room]:
-                    await client.send_json({
-                        "type": "update",
-                        "text": notes[room]
-                    })
+
+                for client in clients[room][:]:
+                    try:
+                        await client.send_json({
+                            "type": "update",
+                            "text": notes[room]
+                        })
+                    except:
+                        pass
 
             if data["type"] == "typing":
-                for client in clients[room]:
+                for client in clients[room][:]:
                     if client != ws:
-                        await client.send_json({
-                            "type": "typing",
-                            "user": data["user"]
-                        })
+                        try:
+                            await client.send_json({
+                                "type": "typing",
+                                "user": data["user"]
+                            })
+                        except:
+                            pass
 
     except:
-        clients[room].remove(ws)
+        if ws in clients[room]:
+            clients[room].remove(ws)

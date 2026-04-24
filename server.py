@@ -8,7 +8,7 @@ html = """
 <html>
 <head>
 <meta charset="UTF-8">
-<title>NoteCord</title>
+<title>real Note</title>
 
 <style>
 body {

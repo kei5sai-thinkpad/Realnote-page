@@ -21,7 +21,7 @@ body {
 }
 
 .sidebar {
-    width: 240px;
+    width: 260px;
     background: #020617;
     padding: 15px;
     border-right: 1px solid #1e293b;
@@ -86,7 +86,6 @@ button {
     color: white;
     cursor: pointer;
     font-weight: bold;
-    transition: 0.2s;
 }
 
 button:hover {
@@ -110,7 +109,6 @@ h3 {
 }
 </style>
 </head>
-
 <body>
 
 <div class="sidebar">
@@ -119,52 +117,37 @@ h3 {
 
     <input
         id="roomInput"
-        placeholder="new room"
-        onkeydown="if(event.key==='Enter') addRoom()"
+        placeholder="部屋名を入力"
+        onkeydown="if(event.key==='Enter') accessRoom()"
     >
 </div>
 
 <div class="main">
 
     <div class="header">
-        <span id="currentRoom"># general</span>
+        <span id="currentRoom">未接続</span>
 
         <div class="header-buttons">
             <button onclick="highlightText('yellow')">🟨 黄</button>
             <button onclick="highlightText('lightgreen')">🟩 緑</button>
             <button onclick="highlightText('lightblue')">🟦 青</button>
-
-            <button onclick="downloadTXT()">📝 TXT保存</button>
-            <button onclick="downloadPDF()">📄 PDF保存</button>
         </div>
     </div>
 
-    <div
-        id="note"
-        contenteditable="true"
-    ></div>
-
+    <div id="note" contenteditable="true"></div>
     <div class="typing" id="typing"></div>
 
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
 <script>
 let ws;
-let isUpdating = false;
 let username = "User" + Math.floor(Math.random() * 1000);
-let rooms = ["general"];
-
-
-/* ---------- 蛍光ペン ---------- */
+let rooms = [];
+let isUpdating = false;
 
 function highlightText(color) {
     document.execCommand("hiliteColor", false, color);
 }
-
-
-/* ---------- 部屋一覧 ---------- */
 
 function renderRooms() {
     const container = document.getElementById("rooms");
@@ -174,43 +157,57 @@ function renderRooms() {
         const div = document.createElement("div");
         div.className = "room";
         div.innerText = "# " + room;
-        div.onclick = () => joinRoom(room);
+        div.onclick = () => accessRoom(room);
         container.appendChild(div);
     });
 }
 
-function addRoom() {
-    const input = document.getElementById("roomInput");
-    const name = input.value.trim();
-
-    if (!name) return;
-
-    if (rooms.includes(name)) {
-        alert("その部屋はすでにあります");
-        return;
-    }
-
-    rooms.push(name);
-    input.value = "";
+async function loadRooms() {
+    const res = await fetch("/rooms");
+    rooms = await res.json();
     renderRooms();
 }
 
+async function accessRoom(clickedRoom = null) {
+    let room = clickedRoom || document.getElementById("roomInput").value.trim();
 
-/* ---------- 部屋接続 ---------- */
+    if (!room) return;
+
+    let password = prompt("パスワードを入力してください");
+
+    if (!password) return;
+
+    const res = await fetch("/join-room", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            room: room,
+            password: password
+        })
+    });
+
+    const result = await res.json();
+
+    if (!result.success) {
+        alert(result.message);
+        return;
+    }
+
+    joinRoom(room);
+    loadRooms();
+}
 
 function joinRoom(room) {
     document.getElementById("currentRoom").innerText = "# " + room;
     const note = document.getElementById("note");
 
-    if (ws) {
-        ws.close();
-    }
+    if (ws) ws.close();
 
     ws = new WebSocket(
         (location.protocol === "https:" ? "wss://" : "ws://")
-        + location.host
-        + "/ws/"
-        + room
+        + location.host + "/ws/" + room
     );
 
     ws.onmessage = (event) => {
@@ -225,20 +222,12 @@ function joinRoom(room) {
         if (data.type === "typing") {
             const typingDiv = document.getElementById("typing");
             typingDiv.innerText = data.user + " が入力中...";
-
-            clearTimeout(window.typingTimer);
-            window.typingTimer = setTimeout(() => {
-                typingDiv.innerText = "";
-            }, 1200);
+            setTimeout(() => typingDiv.innerText = "", 1000);
         }
     };
 
     note.oninput = () => {
-        if (
-            ws &&
-            ws.readyState === WebSocket.OPEN &&
-            !isUpdating
-        ) {
+        if (ws && ws.readyState === WebSocket.OPEN && !isUpdating) {
             ws.send(JSON.stringify({
                 type: "update",
                 text: note.innerHTML
@@ -252,48 +241,7 @@ function joinRoom(room) {
     };
 }
 
-
-/* ---------- TXT保存 ---------- */
-
-function downloadTXT() {
-    const text = document.getElementById("note").innerText;
-    const room = document.getElementById("currentRoom").innerText.replace("# ", "");
-    const date = new Date().toISOString().slice(0, 10);
-
-    const blob = new Blob([text], {
-        type: "text/plain"
-    });
-
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = room + "_" + date + ".txt";
-    a.click();
-}
-
-
-/* ---------- PDF保存 ---------- */
-
-function downloadPDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-
-    const text = document.getElementById("note").innerText || "空のノート";
-    const room = document.getElementById("currentRoom").innerText.replace("# ", "");
-    const date = new Date().toISOString().slice(0, 10);
-
-    const lines = doc.splitTextToSize(text, 180);
-
-    doc.setFontSize(12);
-    doc.text(lines, 10, 15);
-
-    doc.save(room + "_" + date + ".pdf");
-}
-
-
-/* ---------- 初期化 ---------- */
-
-renderRooms();
-joinRoom("general");
+loadRooms();
 </script>
 
 </body>
@@ -302,11 +250,56 @@ joinRoom("general");
 
 clients = {}
 notes = {}
+room_passwords = {}
+
+from pydantic import BaseModel
+
+class RoomData(BaseModel):
+    room: str
+    password: str
 
 
 @app.get("/")
 async def get():
     return HTMLResponse(html)
+
+
+@app.get("/rooms")
+async def get_rooms():
+    return list(room_passwords.keys())
+
+
+@app.post("/join-room")
+async def join_room(data: RoomData):
+    room = data.room.strip()
+    password = data.password.strip()
+
+    if not room or not password:
+        return {
+            "success": False,
+            "message": "部屋名とパスワードを入力してください"
+        }
+
+    if room not in room_passwords:
+        room_passwords[room] = password
+        notes[room] = ""
+        clients[room] = []
+
+        return {
+            "success": True,
+            "message": "新しい部屋を作成しました"
+        }
+
+    if room_passwords[room] != password:
+        return {
+            "success": False,
+            "message": "パスワードが違います"
+        }
+
+    return {
+        "success": True,
+        "message": "入室成功"
+    }
 
 
 @app.websocket("/ws/{room}")
@@ -315,6 +308,8 @@ async def websocket(ws: WebSocket, room: str):
 
     if room not in clients:
         clients[room] = []
+
+    if room not in notes:
         notes[room] = ""
 
     clients[room].append(ws)
@@ -332,7 +327,7 @@ async def websocket(ws: WebSocket, room: str):
                 notes[room] = data["text"]
 
                 for client in clients[room][:]:
-                    if client != ws:  # ← 自分には返さない
+                    if client != ws:
                         try:
                             await client.send_json({
                                 "type": "update",

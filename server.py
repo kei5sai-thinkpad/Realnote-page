@@ -141,7 +141,18 @@ h3 {
 
 <script>
 let ws;
-let username = "User" + Math.floor(Math.random() * 1000);
+
+let username = localStorage.getItem("notecord_username");
+
+if (!username) {
+    username = prompt("ユーザー名を入力してください");
+
+    if (!username || username.trim() === "") {
+        username = "User" + Math.floor(Math.random() * 1000);
+    }
+
+    localStorage.setItem("notecord_username", username);
+}
 let rooms = [];
 let isUpdating = false;
 

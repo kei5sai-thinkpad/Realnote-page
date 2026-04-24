@@ -1,14 +1,28 @@
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 
 app = FastAPI()
 
+# ----------------------------
+# データ保存
+# ----------------------------
+clients = {}
+notes = {}
+room_passwords = {}
+room_types = {}      # shared / readonly
+room_owners = {}     # 作成者 username
+
+
+# ----------------------------
+# HTML
+# ----------------------------
 html = """
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>real Note</title>
+<title>NoteCord</title>
 
 <style>
 body {
@@ -21,7 +35,7 @@ body {
 }
 
 .sidebar {
-    width: 260px;
+    width: 280px;
     background: #020617;
     padding: 15px;
     border-right: 1px solid #1e293b;
@@ -32,7 +46,7 @@ body {
     border-radius: 10px;
     cursor: pointer;
     margin-bottom: 6px;
-    transition: 0.2s;
+    background: #111827;
 }
 
 .room:hover {
@@ -54,22 +68,14 @@ body {
     align-items: center;
 }
 
-.header-buttons {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
 #note {
     flex: 1;
     padding: 20px;
-    background: #0f172a;
-    color: white;
-    font-size: 16px;
-    line-height: 1.6;
     outline: none;
     overflow: auto;
     white-space: pre-wrap;
+    font-size: 16px;
+    line-height: 1.6;
 }
 
 .typing {
@@ -78,69 +84,61 @@ body {
     min-height: 24px;
 }
 
+input, button, select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 10px;
+    border: none;
+    box-sizing: border-box;
+}
+
 button {
     background: #3b82f6;
-    border: none;
-    padding: 10px 14px;
-    border-radius: 10px;
     color: white;
     cursor: pointer;
-    font-weight: bold;
 }
 
 button:hover {
     background: #2563eb;
-}
-
-input {
-    width: 100%;
-    padding: 10px;
-    margin-top: 12px;
-    border-radius: 10px;
-    border: none;
-    outline: none;
-    background: #1e293b;
-    color: white;
-    box-sizing: border-box;
-}
-
-h3 {
-    margin-top: 0;
 }
 </style>
 </head>
 <body>
 
 <div class="sidebar">
-    <h3>Rooms</h3>
+    <h2>Rooms</h2>
+
     <div id="rooms"></div>
 
-    <input
-        id="roomInput"
-        placeholder="部屋名を入力"
-        onkeydown="if(event.key==='Enter') accessRoom()"
-    >
+    <input id="roomInput" placeholder="部屋名">
+
+    <select id="roomType">
+        <option value="shared">共有ノート</option>
+        <option value="readonly">閲覧専用ノート</option>
+    </select>
+
+    <button onclick="accessRoom()">入室 / 作成</button>
 </div>
 
 <div class="main">
-
     <div class="header">
         <span id="currentRoom">未接続</span>
-
-        <div class="header-buttons">
-            <button onclick="highlightText('yellow')">🟨 黄</button>
-            <button onclick="highlightText('lightgreen')">🟩 緑</button>
-            <button onclick="highlightText('lightblue')">🟦 青</button>
-        </div>
+        <span id="modeLabel"></span>
     </div>
 
     <div id="note" contenteditable="true"></div>
     <div class="typing" id="typing"></div>
-
 </div>
 
 <script>
 let ws;
+let currentRoom = "";
+let isUpdating = false;
+
+/* ----------------------------
+ユーザー名
+---------------------------- */
 
 let username = localStorage.getItem("notecord_username");
 
@@ -153,38 +151,48 @@ if (!username) {
 
     localStorage.setItem("notecord_username", username);
 }
-let rooms = [];
-let isUpdating = false;
 
-function highlightText(color) {
-    document.execCommand("hiliteColor", false, color);
-}
 
-function renderRooms() {
+/* ----------------------------
+部屋一覧
+---------------------------- */
+
+async function loadRooms() {
+    const res = await fetch("/rooms");
+    const rooms = await res.json();
+
     const container = document.getElementById("rooms");
     container.innerHTML = "";
 
     rooms.forEach(room => {
         const div = document.createElement("div");
         div.className = "room";
-        div.innerText = "# " + room;
-        div.onclick = () => accessRoom(room);
+        div.innerText = room.name + " (" + room.label + ")";
+        div.onclick = () => quickJoin(room.name);
         container.appendChild(div);
     });
 }
 
-async function loadRooms() {
-    const res = await fetch("/rooms");
-    rooms = await res.json();
-    renderRooms();
+function quickJoin(name) {
+    document.getElementById("roomInput").value = name;
+    accessRoom();
 }
 
-async function accessRoom(clickedRoom = null) {
-    let room = clickedRoom || document.getElementById("roomInput").value.trim();
 
-    if (!room) return;
+/* ----------------------------
+入室 / 作成
+---------------------------- */
 
-    let password = prompt("パスワードを入力してください");
+async function accessRoom() {
+    const room = document.getElementById("roomInput").value.trim();
+    const type = document.getElementById("roomType").value;
+
+    if (!room) {
+        alert("部屋名を入力してください");
+        return;
+    }
+
+    const password = prompt("パスワードを入力してください");
 
     if (!password) return;
 
@@ -195,7 +203,9 @@ async function accessRoom(clickedRoom = null) {
         },
         body: JSON.stringify({
             room: room,
-            password: password
+            password: password,
+            room_type: type,
+            username: username
         })
     });
 
@@ -206,13 +216,32 @@ async function accessRoom(clickedRoom = null) {
         return;
     }
 
-    joinRoom(room);
+    connectRoom(room, result.can_edit, result.label);
     loadRooms();
 }
 
-function joinRoom(room) {
+
+/* ----------------------------
+接続
+---------------------------- */
+
+function connectRoom(room, canEdit, label) {
+    currentRoom = room;
+
     document.getElementById("currentRoom").innerText = "# " + room;
+    document.getElementById("modeLabel").innerText = label;
+
     const note = document.getElementById("note");
+
+    note.contentEditable = canEdit ? "true" : "false";
+
+    if (!canEdit) {
+        note.style.opacity = "0.9";
+        note.style.border = "2px solid #334155";
+    } else {
+        note.style.opacity = "1";
+        note.style.border = "none";
+    }
 
     if (ws) ws.close();
 
@@ -231,14 +260,20 @@ function joinRoom(room) {
         }
 
         if (data.type === "typing") {
-            const typingDiv = document.getElementById("typing");
-            typingDiv.innerText = data.user + " が入力中...";
-            setTimeout(() => typingDiv.innerText = "", 1000);
+            const typing = document.getElementById("typing");
+            typing.innerText = data.user + " が入力中...";
+            setTimeout(() => typing.innerText = "", 1000);
         }
     };
 
     note.oninput = () => {
-        if (ws && ws.readyState === WebSocket.OPEN && !isUpdating) {
+        if (!canEdit) return;
+
+        if (
+            ws &&
+            ws.readyState === WebSocket.OPEN &&
+            !isUpdating
+        ) {
             ws.send(JSON.stringify({
                 type: "update",
                 text: note.innerHTML
@@ -259,46 +294,56 @@ loadRooms();
 </html>
 """
 
-clients = {}
-notes = {}
-room_passwords = {}
 
-from pydantic import BaseModel
+# ----------------------------
+# API
+# ----------------------------
 
 class RoomData(BaseModel):
     room: str
     password: str
+    room_type: str
+    username: str
 
 
 @app.get("/")
-async def get():
+async def home():
     return HTMLResponse(html)
 
 
 @app.get("/rooms")
 async def get_rooms():
-    return list(room_passwords.keys())
+    result = []
+
+    for room in room_passwords:
+        t = room_types.get(room, "shared")
+
+        result.append({
+            "name": room,
+            "label": "閲覧専用" if t == "readonly" else "共有"
+        })
+
+    return result
 
 
 @app.post("/join-room")
 async def join_room(data: RoomData):
     room = data.room.strip()
     password = data.password.strip()
-
-    if not room or not password:
-        return {
-            "success": False,
-            "message": "部屋名とパスワードを入力してください"
-        }
+    room_type = data.room_type
+    username = data.username
 
     if room not in room_passwords:
         room_passwords[room] = password
+        room_types[room] = room_type
+        room_owners[room] = username
         notes[room] = ""
         clients[room] = []
 
         return {
             "success": True,
-            "message": "新しい部屋を作成しました"
+            "can_edit": True,
+            "label": "作成者"
         }
 
     if room_passwords[room] != password:
@@ -307,9 +352,23 @@ async def join_room(data: RoomData):
             "message": "パスワードが違います"
         }
 
+    is_owner = room_owners.get(room) == username
+    is_readonly = room_types.get(room) == "readonly"
+
+    can_edit = True
+    label = "共有ノート"
+
+    if is_readonly and not is_owner:
+        can_edit = False
+        label = "閲覧専用"
+
+    if is_owner:
+        label = "作成者"
+
     return {
         "success": True,
-        "message": "入室成功"
+        "can_edit": can_edit,
+        "label": label
     }
 
 

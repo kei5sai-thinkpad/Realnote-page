@@ -192,9 +192,7 @@ async function accessRoom() {
         return;
     }
 
-    const password = prompt("パスワードを入力してください");
-
-    if (!password) return;
+    const password = prompt("パスワード（空でもOK）を入力してください") || "";
 
     const res = await fetch("/join-room", {
         method: "POST",
@@ -301,7 +299,7 @@ loadRooms();
 
 class RoomData(BaseModel):
     room: str
-    password: str
+    password: str = ""
     room_type: str
     username: str
 
@@ -333,8 +331,15 @@ async def join_room(data: RoomData):
     room_type = data.room_type
     username = data.username
 
+    if not room:
+        return {
+            "success": False,
+            "message": "部屋名を入力してください"
+        }
+
+    # 初回作成
     if room not in room_passwords:
-        room_passwords[room] = password
+        room_passwords[room] = password  # 空文字でも保存
         room_types[room] = room_type
         room_owners[room] = username
         notes[room] = ""
@@ -346,12 +351,17 @@ async def join_room(data: RoomData):
             "label": "作成者"
         }
 
-    if room_passwords[room] != password:
-        return {
-            "success": False,
-            "message": "パスワードが違います"
-        }
+    saved_password = room_passwords.get(room, "")
 
+    # パスワード付き部屋 → 一致必須
+    if saved_password != "":
+        if saved_password != password:
+            return {
+                "success": False,
+                "message": "パスワードが違います"
+            }
+
+    # パスワードなし部屋 → 誰でも入れる
     is_owner = room_owners.get(room) == username
     is_readonly = room_types.get(room) == "readonly"
 

@@ -142,7 +142,6 @@ h3 {
     <div
         id="note"
         contenteditable="true"
-        placeholder="ここにメモを書いてください..."
     ></div>
 
     <div class="typing" id="typing"></div>
@@ -213,10 +212,6 @@ function joinRoom(room) {
         + "/ws/"
         + room
     );
-
-    ws.onopen = () => {
-        console.log("connected:", room);
-    };
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -337,13 +332,14 @@ async def websocket(ws: WebSocket, room: str):
                 notes[room] = data["text"]
 
                 for client in clients[room][:]:
-                    try:
-                        await client.send_json({
-                            "type": "update",
-                            "text": notes[room]
-                        })
-                    except:
-                        pass
+                    if client != ws:  # ← 自分には返さない
+                        try:
+                            await client.send_json({
+                                "type": "update",
+                                "text": notes[room]
+                            })
+                        except:
+                            pass
 
             if data["type"] == "typing":
                 for client in clients[room][:]:

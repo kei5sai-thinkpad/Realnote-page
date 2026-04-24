@@ -57,18 +57,19 @@ body {
 .header-buttons {
     display: flex;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
-textarea {
+#note {
     flex: 1;
-    border: none;
-    outline: none;
-    resize: none;
     padding: 20px;
     background: #0f172a;
     color: white;
     font-size: 16px;
     line-height: 1.6;
+    outline: none;
+    overflow: auto;
+    white-space: pre-wrap;
 }
 
 .typing {
@@ -129,12 +130,20 @@ h3 {
         <span id="currentRoom"># general</span>
 
         <div class="header-buttons">
+            <button onclick="highlightText('yellow')">🟨 黄</button>
+            <button onclick="highlightText('lightgreen')">🟩 緑</button>
+            <button onclick="highlightText('lightblue')">🟦 青</button>
+
             <button onclick="downloadTXT()">📝 TXT保存</button>
             <button onclick="downloadPDF()">📄 PDF保存</button>
         </div>
     </div>
 
-    <textarea id="note" placeholder="ここにメモを書いてください..."></textarea>
+    <div
+        id="note"
+        contenteditable="true"
+        placeholder="ここにメモを書いてください..."
+    ></div>
 
     <div class="typing" id="typing"></div>
 
@@ -147,6 +156,13 @@ let ws;
 let isUpdating = false;
 let username = "User" + Math.floor(Math.random() * 1000);
 let rooms = ["general"];
+
+
+/* ---------- 蛍光ペン ---------- */
+
+function highlightText(color) {
+    document.execCommand("hiliteColor", false, color);
+}
 
 
 /* ---------- 部屋一覧 ---------- */
@@ -169,6 +185,7 @@ function addRoom() {
     const name = input.value.trim();
 
     if (!name) return;
+
     if (rooms.includes(name)) {
         alert("その部屋はすでにあります");
         return;
@@ -206,7 +223,7 @@ function joinRoom(room) {
 
         if (data.type === "init" || data.type === "update") {
             isUpdating = true;
-            note.value = data.text;
+            note.innerHTML = data.text;
             isUpdating = false;
         }
 
@@ -229,7 +246,7 @@ function joinRoom(room) {
         ) {
             ws.send(JSON.stringify({
                 type: "update",
-                text: note.value
+                text: note.innerHTML
             }));
 
             ws.send(JSON.stringify({
@@ -244,7 +261,7 @@ function joinRoom(room) {
 /* ---------- TXT保存 ---------- */
 
 function downloadTXT() {
-    const text = document.getElementById("note").value;
+    const text = document.getElementById("note").innerText;
     const room = document.getElementById("currentRoom").innerText.replace("# ", "");
     const date = new Date().toISOString().slice(0, 10);
 
@@ -265,7 +282,7 @@ function downloadPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    const text = document.getElementById("note").value || "空のノート";
+    const text = document.getElementById("note").innerText || "空のノート";
     const room = document.getElementById("currentRoom").innerText.replace("# ", "");
     const date = new Date().toISOString().slice(0, 10);
 

@@ -155,6 +155,57 @@ if (!username) {
 }
 
 
+/* HTMLエスケープ */
+
+function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.innerText = text;
+    return div.innerHTML;
+}
+
+
+/* コード自動認識 */
+
+function formatCodeBlocks(text) {
+    return text.replace(
+        /```(\\w+)?\\n([\\s\\S]*?)```/g,
+        function(match, lang, code) {
+            return `
+                <div style="
+                    background:#111827;
+                    border:1px solid #334155;
+                    border-radius:14px;
+                    margin:14px 0;
+                    overflow:hidden;
+                ">
+                    <div style="
+                        background:#0b1220;
+                        padding:10px 14px;
+                        border-bottom:1px solid #334155;
+                        font-size:13px;
+                        font-weight:bold;
+                        color:#cbd5e1;
+                    ">
+                        ${lang || "code"}
+                    </div>
+
+                    <pre style="
+                        margin:0;
+                        padding:16px;
+                        font-family:Consolas, monospace;
+                        font-size:14px;
+                        line-height:1.7;
+                        white-space:pre-wrap;
+                        overflow-x:auto;
+                        color:white;
+                    ">${escapeHtml(code)}</pre>
+                </div>
+            `;
+        }
+    );
+}
+
+
 /* 部屋一覧 */
 
 async function loadRooms() {
@@ -239,7 +290,7 @@ function connectRoom(room, canEdit, label) {
 
         if (data.type === "init" || data.type === "update") {
             isUpdating = true;
-            note.innerHTML = data.text;
+            note.innerHTML = formatCodeBlocks(data.text);
             isUpdating = false;
         }
 
@@ -260,7 +311,7 @@ function connectRoom(room, canEdit, label) {
         ) {
             ws.send(JSON.stringify({
                 type: "update",
-                text: note.innerHTML
+                text: note.innerText
             }));
 
             ws.send(JSON.stringify({

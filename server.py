@@ -1,4 +1,4 @@
-# server.py（SQLite完全接続版）
+# server.py（修正版：コード自動認識対応 + 保存修正）
 
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
@@ -14,13 +14,7 @@ from database import (
 
 app = FastAPI()
 
-# WebSocket接続中ユーザー
 clients = {}
-
-
-# ----------------------------
-# HTML
-# ----------------------------
 
 html = """
 <!DOCTYPE html>
@@ -103,17 +97,12 @@ button {
     color: white;
     cursor: pointer;
 }
-
-button:hover {
-    background: #2563eb;
-}
 </style>
 </head>
 <body>
 
 <div class="sidebar">
     <h2>Rooms</h2>
-
     <div id="rooms"></div>
 
     <input id="roomInput" placeholder="部屋名">
@@ -140,8 +129,6 @@ button:hover {
 let ws;
 let isUpdating = false;
 
-/* ユーザー名 */
-
 let username = localStorage.getItem("notecord_username");
 
 if (!username) {
@@ -154,17 +141,11 @@ if (!username) {
     localStorage.setItem("notecord_username", username);
 }
 
-
-/* HTMLエスケープ */
-
 function escapeHtml(text) {
     const div = document.createElement("div");
     div.innerText = text;
     return div.innerHTML;
 }
-
-
-/* コード自動認識 */
 
 function formatCodeBlocks(text) {
     const regex = new RegExp(
@@ -207,9 +188,6 @@ function formatCodeBlocks(text) {
     });
 }
 
-
-/* 部屋一覧 */
-
 async function loadRooms() {
     const res = await fetch("/rooms");
     const rooms = await res.json();
@@ -230,9 +208,6 @@ function quickJoin(name) {
     document.getElementById("roomInput").value = name;
     accessRoom();
 }
-
-
-/* 入室 / 作成 */
 
 async function accessRoom() {
     const room = document.getElementById("roomInput").value.trim();
@@ -269,15 +244,11 @@ async function accessRoom() {
     loadRooms();
 }
 
-
-/* 接続 */
-
 function connectRoom(room, canEdit, label) {
     document.getElementById("currentRoom").innerText = "# " + room;
     document.getElementById("modeLabel").innerText = label;
 
     const note = document.getElementById("note");
-
     note.contentEditable = canEdit ? "true" : "false";
 
     if (ws) ws.close();
@@ -313,7 +284,7 @@ function connectRoom(room, canEdit, label) {
         ) {
             ws.send(JSON.stringify({
                 type: "update",
-                text: note.innerHTML
+                text: note.innerText
             }));
 
             ws.send(JSON.stringify({
@@ -331,10 +302,6 @@ loadRooms();
 </html>
 """
 
-
-# ----------------------------
-# API
-# ----------------------------
 
 class RoomData(BaseModel):
     room: str

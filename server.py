@@ -167,42 +167,44 @@ function escapeHtml(text) {
 /* コード自動認識 */
 
 function formatCodeBlocks(text) {
-    return text.replace(
-        /```(\w+)?\n([\s\S]*?)```/g,
-        function(match, lang, code) {
-            return `
-                <div style="
-                    background:#111827;
-                    border:1px solid #334155;
-                    border-radius:14px;
-                    margin:14px 0;
-                    overflow:hidden;
-                ">
-                    <div style="
-                        background:#0b1220;
-                        padding:10px 14px;
-                        border-bottom:1px solid #334155;
-                        font-size:13px;
-                        font-weight:bold;
-                        color:#cbd5e1;
-                    ">
-                        ${lang || "code"}
-                    </div>
-
-                    <pre style="
-                        margin:0;
-                        padding:16px;
-                        font-family:Consolas, monospace;
-                        font-size:14px;
-                        line-height:1.7;
-                        white-space:pre-wrap;
-                        overflow-x:auto;
-                        color:white;
-                    ">${escapeHtml(code)}</pre>
-                </div>
-            `;
-        }
+    const regex = new RegExp(
+        "```([a-zA-Z0-9]+)?\\\\n([\\\\s\\\\S]*?)```",
+        "g"
     );
+
+    return text.replace(regex, function(match, lang, code) {
+        return `
+            <div style="
+                background:#111827;
+                border:1px solid #334155;
+                border-radius:14px;
+                margin:14px 0;
+                overflow:hidden;
+            ">
+                <div style="
+                    background:#0b1220;
+                    padding:10px 14px;
+                    border-bottom:1px solid #334155;
+                    font-size:13px;
+                    font-weight:bold;
+                    color:#cbd5e1;
+                ">
+                    ${lang || "code"}
+                </div>
+
+                <pre style="
+                    margin:0;
+                    padding:16px;
+                    font-family:Consolas, monospace;
+                    font-size:14px;
+                    line-height:1.7;
+                    white-space:pre-wrap;
+                    overflow-x:auto;
+                    color:white;
+                ">${escapeHtml(code)}</pre>
+            </div>
+        `;
+    });
 }
 
 
@@ -311,7 +313,7 @@ function connectRoom(room, canEdit, label) {
         ) {
             ws.send(JSON.stringify({
                 type: "update",
-                text: note.innerText
+                text: note.innerHTML
             }));
 
             ws.send(JSON.stringify({
@@ -375,7 +377,6 @@ async def join_room(data: RoomData):
 
     room_data = get_room(room)
 
-    # 新規作成
     if not room_data:
         create_room(
             room=room,

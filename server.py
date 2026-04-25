@@ -168,7 +168,7 @@ function escapeHtml(text) {
 
 function formatCodeBlocks(text) {
     return text.replace(
-        /```(\\w+)?\\n([\\s\\S]*?)```/g,
+        /```(\w+)?\n([\s\S]*?)```/g,
         function(match, lang, code) {
             return `
                 <div style="

@@ -77,6 +77,12 @@ body {
     line-height: 1.6;
 }
 
+#note:empty:before {
+    content: attr(data-placeholder);
+    color: #94a3b8;
+    pointer-events: none;
+}
+
 .typing {
     padding: 10px 20px;
     color: #94a3b8;

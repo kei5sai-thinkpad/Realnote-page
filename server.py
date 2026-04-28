@@ -1,4 +1,4 @@
-# server.py（loadRoomsエラー修正版）
+# server.py（修正版：コード自動認識 + 招待リンク機能追加）
 
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
@@ -121,7 +121,7 @@ button {
 
         <div style="display:flex; gap:10px; align-items:center;">
             <button onclick="copyInviteLink()" style="width:auto;">
-                招待リンク
+                招待リンク生成
             </button>
 
             <span id="modeLabel"></span>
@@ -129,9 +129,8 @@ button {
     </div>
 
     <div id="note" contenteditable="true">
-        ノートに入室した時に表示されます
-    </div>
-
+    ノートに入室した時に表示されます
+</div>
     <div class="typing" id="typing"></div>
 </div>
 
@@ -150,6 +149,53 @@ if (!username) {
     }
 
     localStorage.setItem("notecord_username", username);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.innerText = text;
+    return div.innerHTML;
+}
+
+function formatCodeBlocks(text) {
+    const regex = new RegExp(
+        "```([a-zA-Z0-9]+)?\\\\n([\\\\s\\\\S]*?)```",
+        "g"
+    );
+
+    return text.replace(regex, function(match, lang, code) {
+        return `
+            <div style="
+                background:#111827;
+                border:1px solid #334155;
+                border-radius:14px;
+                margin:14px 0;
+                overflow:hidden;
+            ">
+                <div style="
+                    background:#0b1220;
+                    padding:10px 14px;
+                    border-bottom:1px solid #334155;
+                    font-size:13px;
+                    font-weight:bold;
+                    color:#cbd5e1;
+                ">
+                    ${lang || "code"}
+                </div>
+
+                <pre style="
+                    margin:0;
+                    padding:16px;
+                    font-family:Consolas, monospace;
+                    font-size:14px;
+                    line-height:1.7;
+                    white-space:pre-wrap;
+                    overflow-x:auto;
+                    color:white;
+                ">${escapeHtml(code)}</pre>
+            </div>
+        `;
+    });
 }
 
 async function loadRooms() {
@@ -173,27 +219,6 @@ function quickJoin(name) {
     accessRoom();
 }
 
-function copyInviteLink() {
-    if (!currentRoomName) {
-        alert("先に部屋へ入室してください");
-        return;
-    }
-
-    const inviteLink =
-        location.origin
-        + "/?room="
-        + encodeURIComponent(currentRoomName)
-        + "&invite=1";
-
-    navigator.clipboard.writeText(inviteLink)
-        .then(() => {
-            alert("招待リンクをコピーしました");
-        })
-        .catch(() => {
-            alert("コピーに失敗しました");
-        });
-}
-
 async function accessRoom() {
     const room = document.getElementById("roomInput").value.trim();
     const type = document.getElementById("roomType").value;
@@ -203,14 +228,7 @@ async function accessRoom() {
         return;
     }
 
-    const params = new URLSearchParams(window.location.search);
-    const isInvite = params.get("invite") === "1";
-
-    let password = "";
-
-    if (!isInvite) {
-        password = prompt("パスワード（空でもOK）を入力してください") || "";
-    }
+    const password = prompt("パスワード（空でもOK）を入力してください") || "";
 
     const res = await fetch("/join-room", {
         method: "POST",
@@ -232,13 +250,84 @@ async function accessRoom() {
         return;
     }
 
+    connectRoom(room, result.can_edit, result.label);
+    loadRooms();
+}
+
+function connectRoom(room, canEdit, label) {
     currentRoomName = room;
 
     document.getElementById("currentRoom").innerText = "# " + room;
-    document.getElementById("modeLabel").innerText = result.label;
+    document.getElementById("modeLabel").innerText = label;
 
-    loadRooms();
+    const note = document.getElementById("note");
+    note.contentEditable = canEdit ? "true" : "false";
+
+    if (ws) ws.close();
+
+    ws = new WebSocket(
+        (location.protocol === "https:" ? "wss://" : "ws://")
+        + location.host + "/ws/" + room
+    );
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "init" || data.type === "update") {
+            isUpdating = true;
+            note.innerHTML = formatCodeBlocks(data.text);
+            isUpdating = false;
+        }
+
+        if (data.type === "typing") {
+            const typing = document.getElementById("typing");
+            typing.innerText = data.user + " が入力中...";
+            setTimeout(() => typing.innerText = "", 1000);
+        }
+    };
+
+    note.oninput = () => {
+        if (!canEdit) return;
+
+        if (
+            ws &&
+            ws.readyState === WebSocket.OPEN &&
+            !isUpdating
+        ) {
+            ws.send(JSON.stringify({
+                type: "update",
+                text: note.innerText
+            }));
+
+            ws.send(JSON.stringify({
+                type: "typing",
+                user: username
+            }));
+        }
+    };
 }
+
+/* 招待リンク */
+
+function copyInviteLink() {
+    if (!currentRoomName) {
+        alert("先に部屋へ入室してください");
+        return;
+    }
+
+    const inviteLink =
+        location.origin + "/?room=" + encodeURIComponent(currentRoomName);
+
+    navigator.clipboard.writeText(inviteLink)
+        .then(() => {
+            alert("招待リンクをコピーしました！");
+        })
+        .catch(() => {
+            alert("コピーに失敗しました");
+        });
+}
+
+/* URLから自動入室 */
 
 window.onload = async () => {
     await loadRooms();
@@ -309,22 +398,26 @@ async def join_room(data: RoomData):
 
         return {
             "success": True,
+            "can_edit": True,
             "label": "作成者"
         }
 
     saved_room, saved_password, saved_type, saved_owner = room_data
 
-    if saved_password != "" and saved_password != password and password != "":
+    if saved_password != "" and saved_password != password:
         return {
             "success": False,
             "message": "パスワードが違います"
         }
 
     is_owner = saved_owner == username
+    is_readonly = saved_type == "readonly"
 
+    can_edit = True
     label = "共有ノート"
 
-    if saved_type == "readonly" and not is_owner:
+    if is_readonly and not is_owner:
+        can_edit = False
         label = "閲覧専用"
 
     if is_owner:
@@ -332,6 +425,7 @@ async def join_room(data: RoomData):
 
     return {
         "success": True,
+        "can_edit": can_edit,
         "label": label
     }
 
@@ -363,6 +457,17 @@ async def websocket(ws: WebSocket, room: str):
                             await client.send_json({
                                 "type": "update",
                                 "text": data["text"]
+                            })
+                        except:
+                            pass
+
+            if data["type"] == "typing":
+                for client in clients[room][:]:
+                    if client != ws:
+                        try:
+                            await client.send_json({
+                                "type": "typing",
+                                "user": data["user"]
                             })
                         except:
                             pass

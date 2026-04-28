@@ -121,14 +121,16 @@ button {
 
         <div style="display:flex; gap:10px; align-items:center;">
             <button onclick="copyInviteLink()" style="width:auto;">
-                🔗 招待リンク
+                招待リンク生成
             </button>
 
             <span id="modeLabel"></span>
         </div>
     </div>
 
-    <div id="note" contenteditable="true"></div>
+    <div id="note" contenteditable="true">
+    ノートに入室した時に表示されます
+</div>
     <div class="typing" id="typing"></div>
 </div>
 

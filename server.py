@@ -183,9 +183,11 @@ button {
         </div>
     </div>
 
-    <div id="note" contenteditable="true">
-        ノートに入室した時に表示されます
-    </div>
+<div
+    id="note"
+    contenteditable="true"
+    data-placeholder="ノートに入室した時に表示されます"
+></div>
 
     <div class="typing" id="typing"></div>
 </div>

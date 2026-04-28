@@ -1,4 +1,4 @@
-# server.py（修正版：コード自動認識対応 + 保存修正）
+# server.py（修正版：コード自動認識 + 招待リンク機能追加）
 
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
@@ -118,7 +118,14 @@ button {
 <div class="main">
     <div class="header">
         <span id="currentRoom">未接続</span>
-        <span id="modeLabel"></span>
+
+        <div style="display:flex; gap:10px; align-items:center;">
+            <button onclick="copyInviteLink()" style="width:auto;">
+                🔗 招待リンク
+            </button>
+
+            <span id="modeLabel"></span>
+        </div>
     </div>
 
     <div id="note" contenteditable="true"></div>
@@ -128,6 +135,7 @@ button {
 <script>
 let ws;
 let isUpdating = false;
+let currentRoomName = "";
 
 let username = localStorage.getItem("notecord_username");
 
@@ -245,6 +253,8 @@ async function accessRoom() {
 }
 
 function connectRoom(room, canEdit, label) {
+    currentRoomName = room;
+
     document.getElementById("currentRoom").innerText = "# " + room;
     document.getElementById("modeLabel").innerText = label;
 
@@ -295,7 +305,39 @@ function connectRoom(room, canEdit, label) {
     };
 }
 
-loadRooms();
+/* 招待リンク */
+
+function copyInviteLink() {
+    if (!currentRoomName) {
+        alert("先に部屋へ入室してください");
+        return;
+    }
+
+    const inviteLink =
+        location.origin + "/?room=" + encodeURIComponent(currentRoomName);
+
+    navigator.clipboard.writeText(inviteLink)
+        .then(() => {
+            alert("招待リンクをコピーしました！");
+        })
+        .catch(() => {
+            alert("コピーに失敗しました");
+        });
+}
+
+/* URLから自動入室 */
+
+window.onload = async () => {
+    await loadRooms();
+
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get("room");
+
+    if (room) {
+        document.getElementById("roomInput").value = room;
+        accessRoom();
+    }
+};
 </script>
 
 </body>

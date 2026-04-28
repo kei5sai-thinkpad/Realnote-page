@@ -1,4 +1,4 @@
-# server.py（必要部分のみ修正版：リアルタイム共有復活 + placeholder修正）
+# server.py（loadRoomsエラー修正版）
 
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
@@ -77,12 +77,6 @@ body {
     line-height: 1.6;
 }
 
-#note:empty:before {
-    content: attr(data-placeholder);
-    color: #94a3b8;
-    pointer-events: none;
-}
-
 .typing {
     padding: 10px 20px;
     color: #94a3b8;
@@ -103,54 +97,9 @@ button {
     color: white;
     cursor: pointer;
 }
-
-#introScreen {
-    position: fixed;
-    inset: 0;
-    backdrop-filter: blur(14px);
-    background: rgba(2, 6, 23, 0.72);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    animation: fadeOutIntro 2.8s ease forwards;
-    animation-delay: 1.5s;
-}
-
-#introTitle {
-    font-size: 52px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    color: white;
-    animation: titleFade 1.4s ease;
-}
-
-@keyframes fadeOutIntro {
-    to {
-        opacity: 0;
-        visibility: hidden;
-    }
-}
-
-@keyframes titleFade {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
 </style>
 </head>
 <body>
-
-<div id="introScreen">
-    <div id="introTitle">
-        Real note
-    </div>
-</div>
 
 <div class="sidebar">
     <h2>Rooms</h2>
@@ -179,11 +128,9 @@ button {
         </div>
     </div>
 
-    <div
-        id="note"
-        contenteditable="true"
-        data-placeholder="ノートに入室した時に表示されます"
-    ></div>
+    <div id="note" contenteditable="true">
+        ノートに入室した時に表示されます
+    </div>
 
     <div class="typing" id="typing"></div>
 </div>
@@ -247,44 +194,6 @@ function copyInviteLink() {
         });
 }
 
-function connectRoom(room) {
-    const note = document.getElementById("note");
-
-    if (ws) {
-        ws.close();
-    }
-
-    ws = new WebSocket(
-        (location.protocol === "https:" ? "wss://" : "ws://")
-        + location.host
-        + "/ws/"
-        + room
-    );
-
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-
-        if (data.type === "init" || data.type === "update") {
-            isUpdating = true;
-            note.innerText = data.text || "";
-            isUpdating = false;
-        }
-    };
-
-    note.oninput = () => {
-        if (
-            ws &&
-            ws.readyState === WebSocket.OPEN &&
-            !isUpdating
-        ) {
-            ws.send(JSON.stringify({
-                type: "update",
-                text: note.innerText
-            }));
-        }
-    };
-}
-
 async function accessRoom() {
     const room = document.getElementById("roomInput").value.trim();
     const type = document.getElementById("roomType").value;
@@ -328,7 +237,6 @@ async function accessRoom() {
     document.getElementById("currentRoom").innerText = "# " + room;
     document.getElementById("modeLabel").innerText = result.label;
 
-    connectRoom(room);
     loadRooms();
 }
 
@@ -348,3 +256,117 @@ window.onload = async () => {
 </body>
 </html>
 """
+
+
+class RoomData(BaseModel):
+    room: str
+    password: str = ""
+    room_type: str
+    username: str
+
+
+@app.get("/")
+async def home():
+    return HTMLResponse(html)
+
+
+@app.get("/rooms")
+async def get_rooms():
+    rows = get_all_rooms()
+
+    result = []
+    for room_name, room_type in rows:
+        result.append({
+            "name": room_name,
+            "label": "閲覧専用" if room_type == "readonly" else "共有"
+        })
+
+    return result
+
+
+@app.post("/join-room")
+async def join_room(data: RoomData):
+    room = data.room.strip()
+    password = data.password.strip()
+    room_type = data.room_type
+    username = data.username
+
+    if not room:
+        return {
+            "success": False,
+            "message": "部屋名を入力してください"
+        }
+
+    room_data = get_room(room)
+
+    if not room_data:
+        create_room(
+            room=room,
+            password=password,
+            room_type=room_type,
+            owner=username
+        )
+
+        return {
+            "success": True,
+            "label": "作成者"
+        }
+
+    saved_room, saved_password, saved_type, saved_owner = room_data
+
+    if saved_password != "" and saved_password != password and password != "":
+        return {
+            "success": False,
+            "message": "パスワードが違います"
+        }
+
+    is_owner = saved_owner == username
+
+    label = "共有ノート"
+
+    if saved_type == "readonly" and not is_owner:
+        label = "閲覧専用"
+
+    if is_owner:
+        label = "作成者"
+
+    return {
+        "success": True,
+        "label": label
+    }
+
+
+@app.websocket("/ws/{room}")
+async def websocket(ws: WebSocket, room: str):
+    await ws.accept()
+
+    if room not in clients:
+        clients[room] = []
+
+    clients[room].append(ws)
+
+    await ws.send_json({
+        "type": "init",
+        "text": get_note(room)
+    })
+
+    try:
+        while True:
+            data = await ws.receive_json()
+
+            if data["type"] == "update":
+                save_note(room, data["text"])
+
+                for client in clients[room][:]:
+                    if client != ws:
+                        try:
+                            await client.send_json({
+                                "type": "update",
+                                "text": data["text"]
+                            })
+                        except:
+                            pass
+
+    except:
+        if ws in clients[room]:
+            clients[room].remove(ws)

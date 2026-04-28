@@ -97,9 +97,58 @@ button {
     color: white;
     cursor: pointer;
 }
+
+#introScreen {
+    position: fixed;
+    inset: 0;
+    backdrop-filter: blur(14px);
+    background: rgba(2, 6, 23, 0.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+
+    animation: fadeOutIntro 2.8s ease forwards;
+    animation-delay: 1.5s;
+}
+
+#introTitle {
+    font-size: 52px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: white;
+
+    animation: titleFade 1.4s ease;
+}
+
+@keyframes fadeOutIntro {
+    to {
+        opacity: 0;
+        visibility: hidden;
+    }
+}
+
+@keyframes titleFade {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 </style>
 </head>
 <body>
+
+<div id="introScreen">
+    <div id="introTitle">
+        Real note
+    </div>
+</div>
 
 <div class="sidebar">
     <h2>Rooms</h2>

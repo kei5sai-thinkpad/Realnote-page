@@ -1,4 +1,4 @@
-# server.py（招待リンクでパスワード不要版）
+# server.py（必要部分のみ修正：招待リンクはパスワード不要）
 
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
@@ -22,25 +22,124 @@ html = """
 <head>
 <meta charset="UTF-8">
 <title>NoteCord</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: sans-serif;
+    background: #0f172a;
+    color: white;
+    display: flex;
+    height: 100vh;
+}
+
+.sidebar {
+    width: 280px;
+    background: #020617;
+    padding: 15px;
+    border-right: 1px solid #1e293b;
+}
+
+.room {
+    padding: 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-bottom: 6px;
+    background: #111827;
+}
+
+.room:hover {
+    background: #1e293b;
+}
+
+.main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.header {
+    padding: 15px 20px;
+    background: #020617;
+    border-bottom: 1px solid #1e293b;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#note {
+    flex: 1;
+    padding: 20px;
+    outline: none;
+    overflow: auto;
+    white-space: pre-wrap;
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.typing {
+    padding: 10px 20px;
+    color: #94a3b8;
+    min-height: 24px;
+}
+
+input, button, select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 10px;
+    border: none;
+    box-sizing: border-box;
+}
+
+button {
+    background: #3b82f6;
+    color: white;
+    cursor: pointer;
+}
+</style>
 </head>
 <body>
+
+<div class="sidebar">
+    <h2>Rooms</h2>
+    <div id="rooms"></div>
+
+    <input id="roomInput" placeholder="部屋名">
+
+    <select id="roomType">
+        <option value="shared">共有ノート</option>
+        <option value="readonly">閲覧専用ノート</option>
+    </select>
+
+    <button onclick="accessRoom()">入室 / 作成</button>
+</div>
 
 <div class="main">
     <div class="header">
         <span id="currentRoom">未接続</span>
-        <button onclick="copyInviteLink()">招待リンク</button>
-        <span id="modeLabel"></span>
+
+        <div style="display:flex; gap:10px; align-items:center;">
+            <button onclick="copyInviteLink()" style="width:auto;">
+                招待リンク
+            </button>
+
+            <span id="modeLabel"></span>
+        </div>
     </div>
 
     <div id="note" contenteditable="true">
         ノートに入室した時に表示されます
     </div>
+
+    <div class="typing" id="typing"></div>
 </div>
 
 <script>
 let ws;
 let isUpdating = false;
 let currentRoomName = "";
+
 let username = localStorage.getItem("notecord_username");
 
 if (!username) {
@@ -76,6 +175,7 @@ function copyInviteLink() {
 
 async function accessRoom() {
     const room = document.getElementById("roomInput").value.trim();
+    const type = document.getElementById("roomType").value;
 
     if (!room) {
         alert("部屋名を入力してください");
@@ -99,7 +199,7 @@ async function accessRoom() {
         body: JSON.stringify({
             room: room,
             password: password,
-            room_type: "shared",
+            room_type: type,
             username: username
         })
     });
@@ -112,61 +212,17 @@ async function accessRoom() {
     }
 
     connectRoom(room, result.can_edit, result.label);
+    loadRooms();
 }
 
-function connectRoom(room, canEdit, label) {
-    currentRoomName = room;
+window.onload = async () => {
+    await loadRooms();
 
-    document.getElementById("currentRoom").innerText = "# " + room;
-    document.getElementById("modeLabel").innerText = label;
-
-    const note = document.getElementById("note");
-    note.contentEditable = canEdit ? "true" : "false";
-
-    if (ws) ws.close();
-
-    ws = new WebSocket(
-        (location.protocol === "https:" ? "wss://" : "ws://")
-        + location.host + "/ws/" + room
-    );
-
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-
-        if (data.type === "init" || data.type === "update") {
-            isUpdating = true;
-            note.innerText = data.text;
-            isUpdating = false;
-        }
-    };
-
-    note.oninput = () => {
-        if (!canEdit) return;
-
-        if (
-            ws &&
-            ws.readyState === WebSocket.OPEN &&
-            !isUpdating
-        ) {
-            ws.send(JSON.stringify({
-                type: "update",
-                text: note.innerText
-            }));
-        }
-    };
-}
-
-window.onload = () => {
     const params = new URLSearchParams(window.location.search);
     const room = params.get("room");
 
     if (room) {
-        const hiddenInput = document.createElement("input");
-        hiddenInput.id = "roomInput";
-        hiddenInput.value = room;
-        hiddenInput.style.display = "none";
-        document.body.appendChild(hiddenInput);
-
+        document.getElementById("roomInput").value = room;
         accessRoom();
     }
 };
@@ -189,12 +245,32 @@ async def home():
     return HTMLResponse(html)
 
 
+@app.get("/rooms")
+async def get_rooms():
+    rows = get_all_rooms()
+
+    result = []
+    for room_name, room_type in rows:
+        result.append({
+            "name": room_name,
+            "label": "閲覧専用" if room_type == "readonly" else "共有"
+        })
+
+    return result
+
+
 @app.post("/join-room")
 async def join_room(data: RoomData):
     room = data.room.strip()
     password = data.password.strip()
     room_type = data.room_type
     username = data.username
+
+    if not room:
+        return {
+            "success": False,
+            "message": "部屋名を入力してください"
+        }
 
     room_data = get_room(room)
 
@@ -214,16 +290,35 @@ async def join_room(data: RoomData):
 
     saved_room, saved_password, saved_type, saved_owner = room_data
 
-    if saved_password != "" and saved_password != password:
+    is_invite_access = password == ""
+
+    if (
+        saved_password != ""
+        and saved_password != password
+        and not is_invite_access
+    ):
         return {
             "success": False,
             "message": "パスワードが違います"
         }
 
+    is_owner = saved_owner == username
+    is_readonly = saved_type == "readonly"
+
+    can_edit = True
+    label = "共有ノート"
+
+    if is_readonly and not is_owner:
+        can_edit = False
+        label = "閲覧専用"
+
+    if is_owner:
+        label = "作成者"
+
     return {
         "success": True,
-        "can_edit": True,
-        "label": "共有ノート"
+        "can_edit": can_edit,
+        "label": label
     }
 
 
@@ -254,6 +349,17 @@ async def websocket(ws: WebSocket, room: str):
                             await client.send_json({
                                 "type": "update",
                                 "text": data["text"]
+                            })
+                        except:
+                            pass
+
+            if data["type"] == "typing":
+                for client in clients[room][:]:
+                    if client != ws:
+                        try:
+                            await client.send_json({
+                                "type": "typing",
+                                "user": data["user"]
                             })
                         except:
                             pass

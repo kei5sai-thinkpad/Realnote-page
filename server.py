@@ -1,4 +1,4 @@
-# server.py（必要部分のみ修正：招待リンクはパスワード不要）
+# server.py（loadRoomsエラー修正版）
 
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
@@ -152,6 +152,27 @@ if (!username) {
     localStorage.setItem("notecord_username", username);
 }
 
+async function loadRooms() {
+    const res = await fetch("/rooms");
+    const rooms = await res.json();
+
+    const container = document.getElementById("rooms");
+    container.innerHTML = "";
+
+    rooms.forEach(room => {
+        const div = document.createElement("div");
+        div.className = "room";
+        div.innerText = room.name + " (" + room.label + ")";
+        div.onclick = () => quickJoin(room.name);
+        container.appendChild(div);
+    });
+}
+
+function quickJoin(name) {
+    document.getElementById("roomInput").value = name;
+    accessRoom();
+}
+
 function copyInviteLink() {
     if (!currentRoomName) {
         alert("先に部屋へ入室してください");
@@ -211,7 +232,11 @@ async function accessRoom() {
         return;
     }
 
-    connectRoom(room, result.can_edit, result.label);
+    currentRoomName = room;
+
+    document.getElementById("currentRoom").innerText = "# " + room;
+    document.getElementById("modeLabel").innerText = result.label;
+
     loadRooms();
 }
 
@@ -284,32 +309,22 @@ async def join_room(data: RoomData):
 
         return {
             "success": True,
-            "can_edit": True,
             "label": "作成者"
         }
 
     saved_room, saved_password, saved_type, saved_owner = room_data
 
-    is_invite_access = password == ""
-
-    if (
-        saved_password != ""
-        and saved_password != password
-        and not is_invite_access
-    ):
+    if saved_password != "" and saved_password != password and password != "":
         return {
             "success": False,
             "message": "パスワードが違います"
         }
 
     is_owner = saved_owner == username
-    is_readonly = saved_type == "readonly"
 
-    can_edit = True
     label = "共有ノート"
 
-    if is_readonly and not is_owner:
-        can_edit = False
+    if saved_type == "readonly" and not is_owner:
         label = "閲覧専用"
 
     if is_owner:
@@ -317,7 +332,6 @@ async def join_room(data: RoomData):
 
     return {
         "success": True,
-        "can_edit": can_edit,
         "label": label
     }
 
@@ -349,17 +363,6 @@ async def websocket(ws: WebSocket, room: str):
                             await client.send_json({
                                 "type": "update",
                                 "text": data["text"]
-                            })
-                        except:
-                            pass
-
-            if data["type"] == "typing":
-                for client in clients[room][:]:
-                    if client != ws:
-                        try:
-                            await client.send_json({
-                                "type": "typing",
-                                "user": data["user"]
                             })
                         except:
                             pass

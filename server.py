@@ -8,7 +8,7 @@ from database import *
 init_db()
 
 app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key="SUPER_SECRET_KEY")
+app.add_middleware(SessionMiddleware, secret_key="kokokaifvjpavioarivjhoia")
 
 clients = {}
 

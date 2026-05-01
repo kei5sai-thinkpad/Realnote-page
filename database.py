@@ -1,138 +1,128 @@
 import sqlite3
 
-# ----------------------------
-# DB接続
-# ----------------------------
-
-conn = sqlite3.connect("notecord.db", check_same_thread=False)
-cursor = conn.cursor()
+DB_NAME = "app.db"
 
 
-# ----------------------------
-# rooms テーブル作成
-# ----------------------------
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS rooms (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    room_name TEXT UNIQUE,
-    password TEXT DEFAULT '',
-    room_type TEXT DEFAULT 'shared',
-    owner TEXT
-)
-""")
+def get_conn():
+    return sqlite3.connect(DB_NAME)
 
 
-# ----------------------------
-# notes テーブル作成
-# ----------------------------
+def init_db():
+    conn = get_conn()
+    cur = conn.cursor()
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    room_name TEXT UNIQUE,
-    content TEXT DEFAULT '',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
-""")
-
-conn.commit()
-
-
-# ----------------------------
-# 部屋作成
-# ----------------------------
-
-def create_room(room, password="", room_type="shared", owner="User"):
-    cursor.execute("""
-        INSERT INTO rooms (room_name, password, room_type, owner)
-        VALUES (?, ?, ?, ?)
-    """, (room, password, room_type, owner))
-
-    cursor.execute("""
-        INSERT INTO notes (room_name, content)
-        VALUES (?, ?)
-    """, (room, ""))
-
-    conn.commit()
-
-
-# ----------------------------
-# 部屋取得
-# ----------------------------
-
-def get_room(room):
-    cursor.execute("""
-        SELECT room_name, password, room_type, owner
-        FROM rooms
-        WHERE room_name = ?
-    """, (room,))
-
-    return cursor.fetchone()
-
-
-# ----------------------------
-# ノート保存
-# ----------------------------
-
-def save_note(room, text):
-    cursor.execute("""
-        UPDATE notes
-        SET content = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE room_name = ?
-    """, (text, room))
-
-    conn.commit()
-
-
-# ----------------------------
-# ノート取得
-# ----------------------------
-
-def get_note(room):
-    cursor.execute("""
-        SELECT content
-        FROM notes
-        WHERE room_name = ?
-    """, (room,))
-
-    result = cursor.fetchone()
-
-    if result:
-        return result[0]
-
-    return ""
-
-
-# ----------------------------
-# 部屋一覧取得
-# ----------------------------
-
-def get_all_rooms():
-    cursor.execute("""
-        SELECT room_name, room_type
-        FROM rooms
-        ORDER BY id DESC
+    # ユーザー
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        icon TEXT
+    )
     """)
 
-    return cursor.fetchall()
+    # ルーム
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS rooms (
+        name TEXT PRIMARY KEY,
+        password TEXT,
+        type TEXT,
+        owner TEXT
+    )
+    """)
+
+    # ノート
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS notes (
+        room TEXT PRIMARY KEY,
+        content TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
 
 
-# ----------------------------
-# テスト
-# ----------------------------
+# ---------- user ----------
+def create_user(user_id, name, icon):
+    conn = get_conn()
+    cur = conn.cursor()
 
-if __name__ == "__main__":
-    if not get_room("general"):
-        create_room(
-            room="general",
-            password="",
-            room_type="shared",
-            owner="Rei"
-        )
+    cur.execute("""
+    INSERT OR REPLACE INTO users (id, name, icon)
+    VALUES (?, ?, ?)
+    """, (user_id, name, icon))
 
-    save_note("general", "SQLite保存成功！")
+    conn.commit()
+    conn.close()
 
-    print(get_room("general"))
-    print(get_note("general"))
-    print(get_all_rooms())
+
+def get_user(user_id):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT id, name, icon FROM users WHERE id=?", (user_id,))
+    row = cur.fetchone()
+
+    conn.close()
+    return row
+
+
+# ---------- room ----------
+def create_room(room, password, room_type, owner):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT INTO rooms VALUES (?, ?, ?, ?)
+    """, (room, password, room_type, owner))
+
+    conn.commit()
+    conn.close()
+
+
+def get_room(room):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM rooms WHERE name=?", (room,))
+    row = cur.fetchone()
+
+    conn.close()
+    return row
+
+
+def get_all_rooms():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT name, type FROM rooms")
+    rows = cur.fetchall()
+
+    conn.close()
+    return rows
+
+
+# ---------- note ----------
+def save_note(room, text):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT OR REPLACE INTO notes (room, content)
+    VALUES (?, ?)
+    """, (room, text))
+
+    conn.commit()
+    conn.close()
+
+
+def get_note(room):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT content FROM notes WHERE room=?", (room,))
+    row = cur.fetchone()
+
+    conn.close()
+
+    return row[0] if row else ""

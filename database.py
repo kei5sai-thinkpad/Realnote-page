@@ -1,5 +1,8 @@
 import sqlite3
+import sqlite3
+import os
 
+DB = os.path.join(os.path.dirname(__file__), "app.db")
 DB = "app.db"
 
 def init_db():

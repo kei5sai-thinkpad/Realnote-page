@@ -1,144 +1,83 @@
-# server.py（修正版：コード自動認識 + 招待リンク機能追加）
+from fastapi import FastAPI, Request, WebSocket
+from fastapi.responses import HTMLResponse, RedirectResponse
+from starlette.middleware.sessions import SessionMiddleware
+from authlib.integrations.starlette_client import OAuth
 
-from fastapi import FastAPI, WebSocket
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+from database import *
 
-from database import (
-    create_room,
-    get_room,
-    save_note,
-    get_note,
-    get_all_rooms
-)
+init_db()
 
 app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key="SUPER_SECRET_KEY")
 
 clients = {}
 
-html = """
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<title>NoteCord</title>
+# ===== OAuth設定（GitHub）=====
+oauth = OAuth()
 
-<style>
-body {
-    margin: 0;
-    font-family: sans-serif;
-    background: #0f172a;
-    color: white;
-    display: flex;
-    height: 100vh;
-}
+oauth.register(
+    name="github",
+    client_id="Ov23liEVy4XOFTYLuyTM",
+    client_secret="17a3ff75aa684e88b2121fbf3aa1528d1cb2c6aa",
+    access_token_url="https://github.com/login/oauth/access_token",
+    authorize_url="https://github.com/login/oauth/authorize",
+    api_base_url="https://api.github.com/",
+    client_kwargs={"scope": "user:email"},
+)
 
-.sidebar {
-    width: 280px;
-    background: #020617;
-    padding: 15px;
-    border-right: 1px solid #1e293b;
-}
+# ===== ログイン =====
+@app.get("/login")
+async def login(request: Request):
+    redirect_uri = request.url_for("auth_callback")
+    return await oauth.github.authorize_redirect(request, redirect_uri)
 
-.room {
-    padding: 10px;
-    border-radius: 10px;
-    cursor: pointer;
-    margin-bottom: 6px;
-    background: #111827;
-}
+# ===== コールバック =====
+@app.get("/auth/callback")
+async def auth_callback(request: Request):
+    token = await oauth.github.authorize_access_token(request)
+    resp = await oauth.github.get("user", token=token)
+    user = resp.json()
 
-.room:hover {
-    background: #1e293b;
-}
+    user_id = str(user["id"])
+    name = user["login"]
+    icon = user["avatar_url"]
 
-.main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
+    create_user(user_id, name, icon)
 
-.header {
-    padding: 15px 20px;
-    background: #020617;
-    border-bottom: 1px solid #1e293b;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
+    request.session["user"] = user_id
 
-#note {
-    flex: 1;
-    padding: 20px;
-    outline: none;
-    overflow: auto;
-    white-space: pre-wrap;
-    font-size: 16px;
-    line-height: 1.6;
-}
+    return RedirectResponse("/")
 
-.typing {
-    padding: 10px 20px;
-    color: #94a3b8;
-    min-height: 24px;
-}
+# ===== ホーム =====
+@app.get("/")
+async def home(request: Request):
+    user_id = request.session.get("user")
 
-input, button, select {
-    width: 100%;
-    padding: 10px;
-    margin-top: 10px;
-    border-radius: 10px;
-    border: none;
-    box-sizing: border-box;
-}
+    if not user_id:
+        return HTMLResponse("""
+        <h2>ログインしてください</h2>
+        <a href="/login">GitHubでログイン</a>
+        """)
 
-button {
-    background: #3b82f6;
-    color: white;
-    cursor: pointer;
-}
-</style>
-</head>
-<body>
+    user = get_user(user_id)
 
-<div class="sidebar">
-    <h2>Rooms</h2>
-    <div id="rooms"></div>
+    return HTMLResponse(f"""
+    <h3>ようこそ {user[1]}</h3>
+    <img src="{user[2]}" width="50" style="border-radius:50%"><br><br>
 
-    <input id="roomInput" placeholder="部屋名">
+    <a href="/app">ノートへ</a>
+    """)
 
-    <select id="roomType">
-        <option value="shared">共有ノート</option>
-        <option value="readonly">閲覧専用ノート</option>
-    </select>
+# ===== ノートUI（ここに今のHTMLそのまま入れる）=====
+@app.get("/app")
+async def app_page(request: Request):
+    user_id = request.session.get("user")
 
-    <button onclick="accessRoom()">入室 / 作成</button>
-</div>
+    if not user_id:
+        return RedirectResponse("/")
 
-<div class="main">
-    <div class="header">
-        <span id="currentRoom">未接続</span>
-
-        <div style="display:flex; gap:10px; align-items:center;">
-            <button onclick="copyInviteLink()" style="width:auto;">
-                招待リンク生成
-            </button>
-
-            <span id="modeLabel"></span>
-        </div>
-    </div>
-
-    <div id="note" contenteditable="true">
-    ノートに入室した時に表示されます
-</div>
-    <div class="typing" id="typing"></div>
-</div>
-
-<script>
-let ws;
-let isUpdating = false;
-let currentRoomName = "";
-
+    return HTMLResponse("""
+    
 let username = localStorage.getItem("notecord_username");
 
 if (!username) {
@@ -344,92 +283,9 @@ window.onload = async () => {
 
 </body>
 </html>
-"""
+    """)
 
-
-class RoomData(BaseModel):
-    room: str
-    password: str = ""
-    room_type: str
-    username: str
-
-
-@app.get("/")
-async def home():
-    return HTMLResponse(html)
-
-
-@app.get("/rooms")
-async def get_rooms():
-    rows = get_all_rooms()
-
-    result = []
-    for room_name, room_type in rows:
-        result.append({
-            "name": room_name,
-            "label": "閲覧専用" if room_type == "readonly" else "共有"
-        })
-
-    return result
-
-
-@app.post("/join-room")
-async def join_room(data: RoomData):
-    room = data.room.strip()
-    password = data.password.strip()
-    room_type = data.room_type
-    username = data.username
-
-    if not room:
-        return {
-            "success": False,
-            "message": "部屋名を入力してください"
-        }
-
-    room_data = get_room(room)
-
-    if not room_data:
-        create_room(
-            room=room,
-            password=password,
-            room_type=room_type,
-            owner=username
-        )
-
-        return {
-            "success": True,
-            "can_edit": True,
-            "label": "作成者"
-        }
-
-    saved_room, saved_password, saved_type, saved_owner = room_data
-
-    if saved_password != "" and saved_password != password:
-        return {
-            "success": False,
-            "message": "パスワードが違います"
-        }
-
-    is_owner = saved_owner == username
-    is_readonly = saved_type == "readonly"
-
-    can_edit = True
-    label = "共有ノート"
-
-    if is_readonly and not is_owner:
-        can_edit = False
-        label = "閲覧専用"
-
-    if is_owner:
-        label = "作成者"
-
-    return {
-        "success": True,
-        "can_edit": can_edit,
-        "label": label
-    }
-
-
+# ===== WebSocket =====
 @app.websocket("/ws/{room}")
 async def websocket(ws: WebSocket, room: str):
     await ws.accept()
@@ -451,27 +307,9 @@ async def websocket(ws: WebSocket, room: str):
             if data["type"] == "update":
                 save_note(room, data["text"])
 
-                for client in clients[room][:]:
+                for client in clients[room]:
                     if client != ws:
-                        try:
-                            await client.send_json({
-                                "type": "update",
-                                "text": data["text"]
-                            })
-                        except:
-                            pass
-
-            if data["type"] == "typing":
-                for client in clients[room][:]:
-                    if client != ws:
-                        try:
-                            await client.send_json({
-                                "type": "typing",
-                                "user": data["user"]
-                            })
-                        except:
-                            pass
+                        await client.send_json(data)
 
     except:
-        if ws in clients[room]:
-            clients[room].remove(ws)
+        clients[room].remove(ws)

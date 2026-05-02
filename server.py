@@ -33,8 +33,8 @@ oauth.register(
 )
 
 # ================= Supabase設定 =================
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+SUPABASE_URL = os.getenv("https://qwoasmceczpcvkuufvkt.supabase.co")
+SUPABASE_ANON_KEY = os.getenv("sb_publishable_U3eBuQImXzRhe7irveKkYQ_cw0RVyem")
 
 # ================= Supabaseトークン検証 =================
 def verify_supabase_token(token: str):

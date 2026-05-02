@@ -3,8 +3,9 @@ import os
 
 DB = os.path.join(os.path.dirname(__file__), "app.db")
 
-# ================= 接続（重要：FastAPI対策） =================
+# ================= 接続（安定版） =================
 def get_conn():
+    # FastAPI + WebSocket 安定化
     return sqlite3.connect(DB, check_same_thread=False)
 
 # ================= 初期化 =================
@@ -23,15 +24,15 @@ def init_db():
     cur.execute("""
     CREATE TABLE IF NOT EXISTS rooms (
         name TEXT PRIMARY KEY,
-        password TEXT,
-        type TEXT
+        password TEXT DEFAULT "",
+        type TEXT NOT NULL
     )
     """)
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS notes (
         room TEXT PRIMARY KEY,
-        content TEXT
+        content TEXT DEFAULT ""
     )
     """)
 
@@ -79,13 +80,13 @@ def get_rooms():
         for r in rows
     ]
 
-# ================= room join/create（完全修正版） =================
+# ================= room create/join（完全安定版） =================
 def join_or_create_room(name, password, room_type):
     conn = get_conn()
     cur = conn.cursor()
 
     try:
-        # 既存チェック
+        # ルーム取得
         cur.execute(
             "SELECT password, type FROM rooms WHERE name=?",
             (name,)
@@ -96,15 +97,12 @@ def join_or_create_room(name, password, room_type):
         if room:
             saved_password, saved_type = room
 
-            # パスワードチェック（空OK対応）
-            if saved_password and saved_password != password:
-                conn.close()
+            # パスワードチェック（空OK）
+            if saved_password and saved_password != (password or ""):
                 return {
                     "success": False,
                     "message": "パスワードが違います"
                 }
-
-            conn.close()
 
             return {
                 "success": True,
@@ -116,7 +114,7 @@ def join_or_create_room(name, password, room_type):
         cur.execute("""
         INSERT INTO rooms (name, password, type)
         VALUES (?, ?, ?)
-        """, (name, password, room_type))
+        """, (name, password or "", room_type))
 
         cur.execute("""
         INSERT INTO notes (room, content)
@@ -124,8 +122,6 @@ def join_or_create_room(name, password, room_type):
         """, (name, ""))
 
         conn.commit()
-
-        conn.close()
 
         return {
             "success": True,
@@ -135,12 +131,13 @@ def join_or_create_room(name, password, room_type):
 
     except Exception as e:
         conn.rollback()
-        conn.close()
-
         return {
             "success": False,
             "message": str(e)
         }
+
+    finally:
+        conn.close()
 
 # ================= notes =================
 def get_note(room):

@@ -66,11 +66,6 @@ async def logout(request: Request):
 # ================= home =================
 @app.get("/")
 async def home(request: Request):
-    if not request.session.get("user"):
-        return HTMLResponse("""
-        <h2>ログイン</h2>
-        <a href="/login/github">GitHubでログイン</a>
-        """)
     return RedirectResponse("/app")
 
 # ================= app =================

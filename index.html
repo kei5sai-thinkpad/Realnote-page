@@ -94,22 +94,19 @@ button {
         <option value="readonly">閲覧専用ノート</option>
     </select>
 
-    <button onclick="accessRoom()">入室 / 作成</button>
+    <button id="joinBtn">入室 / 作成</button>
 
     <hr>
 
-    <button onclick="loginEmail()">メールログイン</button>
-    <button onclick="signupEmail()">新規登録</button>
+    <button id="loginBtn">メールログイン</button>
+    <button id="signupBtn">新規登録</button>
 </div>
 
 <div class="main">
     <div class="header">
         <span id="currentRoom">未接続</span>
-
         <div style="display:flex; gap:10px; align-items:center;">
-            <button onclick="copyInviteLink()" style="width:auto;">
-                招待リンク
-            </button>
+            <button id="inviteBtn" style="width:auto;">招待リンク</button>
             <span id="modeLabel"></span>
         </div>
     </div>
@@ -133,21 +130,16 @@ let ws;
 let isUpdating = false;
 let currentRoomName = "";
 
-/* ================= ユーザー ================= */
+/* ===== ユーザー ===== */
 let username = localStorage.getItem("notecord_username");
 
 if (!username) {
-    username = prompt("ユーザー名を入力してください");
-
-    if (!username || username.trim() === "") {
-        username = "User" + Math.floor(Math.random() * 1000);
-    }
-
+    username = prompt("ユーザー名を入力してください") || ("User" + Math.floor(Math.random()*1000));
     localStorage.setItem("notecord_username", username);
 }
 
-/* ================= Supabaseログイン ================= */
-window.loginEmail = async function () {
+/* ===== Supabase ===== */
+async function loginEmail() {
     const email = prompt("メールアドレス");
     const password = prompt("パスワード");
 
@@ -156,16 +148,13 @@ window.loginEmail = async function () {
         password
     });
 
-    if (error) {
-        alert(error.message);
-        return;
-    }
+    if (error) return alert(error.message);
 
     localStorage.setItem("sb_token", data.session.access_token);
-    alert("ログイン成功！");
-};
+    alert("ログイン成功");
+}
 
-window.signupEmail = async function () {
+async function signupEmail() {
     const email = prompt("メールアドレス");
     const password = prompt("パスワード");
 
@@ -174,37 +163,11 @@ window.signupEmail = async function () {
         password
     });
 
-    if (error) {
-        alert(error.message);
-    } else {
-        alert("メール確認してください");
-    }
-};
-
-/* ================= HTML安全化 ================= */
-function escapeHtml(text) {
-    const div = document.createElement("div");
-    div.innerText = text;
-    return div.innerHTML;
+    if (error) alert(error.message);
+    else alert("メール確認してください");
 }
 
-/* ================= コードブロック ================= */
-function formatCodeBlocks(text) {
-    return text.replace(/```([a-zA-Z0-9]+)?\n([\s\S]*?)```/g, 
-    function(match, lang, code) {
-        return `
-        <div style="background:#111827;border:1px solid #334155;border-radius:14px;margin:14px 0;overflow:hidden;">
-            <div style="background:#0b1220;padding:10px 14px;border-bottom:1px solid #334155;font-size:13px;font-weight:bold;color:#cbd5e1;">
-                ${lang || "code"}
-            </div>
-            <pre style="margin:0;padding:16px;font-family:Consolas,monospace;font-size:14px;line-height:1.7;white-space:pre-wrap;color:white;">
-${escapeHtml(code)}
-            </pre>
-        </div>`;
-    });
-}
-
-/* ================= ルーム取得 ================= */
+/* ===== rooms ===== */
 async function loadRooms() {
     const res = await fetch("/rooms");
     const rooms = await res.json();
@@ -215,35 +178,28 @@ async function loadRooms() {
     rooms.forEach(room => {
         const div = document.createElement("div");
         div.className = "room";
-        div.innerText = room.name + " (" + room.label + ")";
-        div.onclick = () => quickJoin(room.name);
+        div.textContent = room.name + " (" + room.label + ")";
+        div.onclick = () => {
+            document.getElementById("roomInput").value = room.name;
+            accessRoom();
+        };
         container.appendChild(div);
     });
 }
 
-function quickJoin(name) {
-    document.getElementById("roomInput").value = name;
-    accessRoom();
-}
-
-/* ================= ルーム参加 ================= */
-window.accessRoom = async function () {
+/* ===== join ===== */
+async function accessRoom() {
     const room = document.getElementById("roomInput").value.trim();
     const type = document.getElementById("roomType").value;
 
-    if (!room) return alert("部屋名を入力してください");
+    if (!room) return alert("部屋名を入力");
 
-    const password = prompt("パスワード（空OK）") || "";
+    const password = prompt("パスワード") || "";
 
     const res = await fetch("/join-room", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({
-            room,
-            password,
-            room_type: type,
-            username
-        })
+        body: JSON.stringify({ room, password, room_type: type, username })
     });
 
     const result = await res.json();
@@ -252,17 +208,17 @@ window.accessRoom = async function () {
 
     connectRoom(room, result.can_edit, result.label);
     loadRooms();
-};
+}
 
-/* ================= 接続 ================= */
+/* ===== connect ===== */
 function connectRoom(room, canEdit, label) {
     currentRoomName = room;
 
-    document.getElementById("currentRoom").innerText = "# " + room;
-    document.getElementById("modeLabel").innerText = label;
+    document.getElementById("currentRoom").textContent = "# " + room;
+    document.getElementById("modeLabel").textContent = label;
 
     const note = document.getElementById("note");
-    note.contentEditable = canEdit ? "true" : "false";
+    note.contentEditable = canEdit;
 
     if (ws) ws.close();
 
@@ -276,21 +232,21 @@ function connectRoom(room, canEdit, label) {
 
         if (data.type === "init" || data.type === "update") {
             isUpdating = true;
-            note.innerHTML = formatCodeBlocks(data.text);
+            note.innerText = data.text;
             isUpdating = false;
         }
 
         if (data.type === "typing") {
             const typing = document.getElementById("typing");
-            typing.innerText = data.user + " が入力中...";
-            setTimeout(() => typing.innerText = "", 1000);
+            typing.textContent = data.user + " が入力中...";
+            setTimeout(() => typing.textContent = "", 1000);
         }
     };
 
     note.oninput = () => {
-        if (!canEdit) return;
+        if (!canEdit || isUpdating) return;
 
-        if (ws && ws.readyState === WebSocket.OPEN && !isUpdating) {
+        if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
                 type: "update",
                 text: note.innerText
@@ -304,19 +260,25 @@ function connectRoom(room, canEdit, label) {
     };
 }
 
-/* ================= 招待リンク ================= */
-window.copyInviteLink = function () {
-    if (!currentRoomName) return alert("先に入室してください");
+/* ===== invite ===== */
+function copyInviteLink() {
+    if (!currentRoomName) return alert("未接続");
 
     const link = location.origin + "/?room=" + currentRoomName;
 
     navigator.clipboard.writeText(link)
-        .then(() => alert("コピーしました"))
+        .then(() => alert("コピー完了"))
         .catch(() => alert("失敗"));
-};
+}
 
-/* ================= 初期化 ================= */
-window.onload = async () => {
+/* ===== init ===== */
+document.addEventListener("DOMContentLoaded", async () => {
+
+    document.getElementById("joinBtn").addEventListener("click", accessRoom);
+    document.getElementById("loginBtn").addEventListener("click", loginEmail);
+    document.getElementById("signupBtn").addEventListener("click", signupEmail);
+    document.getElementById("inviteBtn").addEventListener("click", copyInviteLink);
+
     await loadRooms();
 
     const params = new URLSearchParams(location.search);
@@ -326,7 +288,7 @@ window.onload = async () => {
         document.getElementById("roomInput").value = room;
         accessRoom();
     }
-};
+});
 </script>
 
 </body>

@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 import os
+import secrets
 
 from database import *
 
@@ -9,76 +10,71 @@ init_db()
 
 app = FastAPI()
 
-# ================= セッション =================
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SECRET_KEY", "super-secret-key")
 )
 
-clients = {}
+# ================= GitHub OAuth（仮） =================
+# ※ここは既存のoauthコード使ってOK
 
-# ================= BASE PATH =================
-BASE_DIR = os.path.dirname(__file__)
+# ================= login callback =================
+@app.get("/auth/callback")
+async def callback(request: Request):
+    # GitHub user取得済み想定
+    user = {
+        "id": "123",
+        "login": "testuser",
+        "avatar_url": ""
+    }
 
-# ================= HTML =================
-@app.get("/app")
-async def app_page():
-    html_path = os.path.join(BASE_DIR, "index.html")
-    with open(html_path, encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+    user_id = str(user["id"])
+    name = user["login"]
+    icon = user["avatar_url"]
 
-# ================= rooms =================
-@app.get("/rooms")
-def rooms():
-    return get_rooms()
+    # 🔥 refresh token生成
+    refresh_token = secrets.token_hex(32)
 
-# ================= join / create =================
-@app.post("/join-room")
-async def join_room(data: dict):
-    room = data.get("room")
-    password = data.get("password", "")
-    room_type = data.get("room_type")
+    create_user(user_id, name, icon, refresh_token)
 
-    if not room:
-        return {"success": False, "message": "room required"}
+    request.session["user"] = user_id
 
-    return join_or_create_room(room, password, room_type)
+    return RedirectResponse("/app")
 
-# ================= websocket =================
-@app.websocket("/ws/{room}")
-async def ws_endpoint(ws: WebSocket, room: str):
-    await ws.accept()
+# ================= restore login =================
+@app.post("/auth/restore")
+async def restore(data: dict):
+    token = data.get("token")
 
-    clients.setdefault(room, set()).add(ws)
+    user = get_user_by_token(token)
 
-    await ws.send_json({
-        "type": "init",
-        "text": get_note(room)
-    })
+    if not user:
+        return {"ok": False}
 
-    try:
-        while True:
-            data = await ws.receive_json()
+    return {
+        "ok": True,
+        "user": {
+            "id": user[0],
+            "name": user[1],
+            "icon": user[2]
+        }
+    }
 
-            # ===== update =====
-            if data["type"] == "update":
-                save_note(room, data["text"])
+# ================= me =================
+@app.get("/me")
+async def me(request: Request):
+    user_id = request.session.get("user")
 
-                for c in list(clients[room]):
-                    if c != ws:
-                        await c.send_json({
-                            "type": "update",
-                            "text": data["text"]
-                        })
+    if not user_id:
+        return {"logged_in": False}
 
-            # ===== typing =====
-            elif data["type"] == "typing":
-                for c in list(clients[room]):
-                    if c != ws:
-                        await c.send_json(data)
+    user = get_user(user_id)
 
-    except WebSocketDisconnect:
-        clients[room].remove(ws)
-
-        if not clients[room]:
-            del clients[room]
+    return {
+        "logged_in": True,
+        "user": {
+            "id": user[0],
+            "name": user[1],
+            "icon": user[2]
+        }
+    }

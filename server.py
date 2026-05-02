@@ -2,9 +2,14 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 import os
-import secrets
 
-from database import *
+from database import (
+    init_db,
+    get_rooms,
+    join_or_create_room,
+    get_note,
+    save_note
+)
 
 # ================= 初期化 =================
 init_db()
@@ -18,15 +23,14 @@ app.add_middleware(
 
 clients = {}
 
-# ================= ルート =================
+# ================= root =================
 @app.get("/")
 async def root():
     return RedirectResponse("/app")
 
 @app.get("/app")
 async def app_page():
-    path = os.path.join(os.path.dirname(__file__), "index.html")
-    with open(path, encoding="utf-8") as f:
+    with open("index.html", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 # ================= rooms =================
@@ -34,12 +38,12 @@ async def app_page():
 def rooms():
     return get_rooms()
 
-# ================= join / create =================
+# ================= join =================
 @app.post("/join-room")
 async def join_room(data: dict):
     room = data.get("room")
     password = data.get("password", "")
-    room_type = data.get("room_type")
+    room_type = data.get("room_type", "shared")
 
     if not room:
         return {"success": False, "message": "room required"}
@@ -65,7 +69,6 @@ async def ws_endpoint(ws: WebSocket, room: str):
         while True:
             data = await ws.receive_json()
 
-            # ===== update =====
             if data["type"] == "update":
                 save_note(room, data["text"])
 
@@ -76,7 +79,6 @@ async def ws_endpoint(ws: WebSocket, room: str):
                             "text": data["text"]
                         })
 
-            # ===== typing =====
             elif data["type"] == "typing":
                 for c in list(clients[room]):
                     if c != ws:

@@ -5,6 +5,11 @@ import os
 import secrets
 
 from database import *
+from fastapi.responses import RedirectResponse
+
+@app.get("/")
+async def root():
+    return RedirectResponse("/app")
 
 init_db()
 

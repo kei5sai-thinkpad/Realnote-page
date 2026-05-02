@@ -10,12 +10,12 @@ init_db()
 
 app = FastAPI()
 
-# ================= セッション（ここが超重要） =================
+# ================= セッション =================
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SECRET_KEY", "super-secret-key"),
-    same_site="lax",     # ← これ重要（CSRF回避）
-    https_only=True      # ← Render用
+    same_site="lax",
+    https_only=True
 )
 
 clients = {}
@@ -33,41 +33,37 @@ oauth.register(
     client_kwargs={"scope": "user:email"},
 )
 
-# ================= GitHubログイン開始 =================
+# ================= login =================
 @app.get("/login/github")
 async def login_github(request: Request):
     redirect_uri = request.url_for("auth_callback")
     return await oauth.github.authorize_redirect(request, redirect_uri)
 
-# ================= コールバック =================
+# ================= callback =================
 @app.get("/auth/callback")
 async def auth_callback(request: Request):
-    try:
-        token = await oauth.github.authorize_access_token(request)
-        resp = await oauth.github.get("user", token=token)
-        user = resp.json()
+    token = await oauth.github.authorize_access_token(request)
+    resp = await oauth.github.get("user", token=token)
+    user = resp.json()
 
-        user_id = str(user["id"])
-        username = user["login"]
-        icon = user["avatar_url"]
+    user_id = str(user["id"])
+    username = user["login"]
+    icon = user["avatar_url"]
 
-        create_user(user_id, username, icon)
+    create_user(user_id, username, icon)
 
-        request.session["user"] = user_id
-        request.session["username"] = username
+    request.session["user"] = user_id
+    request.session["username"] = username
 
-        return RedirectResponse("/app")
+    return RedirectResponse("/app")
 
-    except Exception as e:
-        return {"error": str(e)}
-
-# ================= ログアウト =================
+# ================= logout =================
 @app.get("/logout")
 async def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/")
 
-# ================= ホーム =================
+# ================= home =================
 @app.get("/")
 async def home(request: Request):
     if not request.session.get("user"):
@@ -77,7 +73,7 @@ async def home(request: Request):
         """)
     return RedirectResponse("/app")
 
-# ================= アプリ =================
+# ================= app =================
 @app.get("/app")
 async def app_page(request: Request):
     user_id = request.session.get("user")

@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
-from authlib.integrations.starlette_client import OAuth
 import os
+import firebase_admin
+from firebase_admin import credentials, auth
 
 from database import *
 
@@ -10,110 +11,59 @@ init_db()
 
 app = FastAPI()
 
-# ================= セッション =================
+# ================= セッション（ログイン状態保持） =================
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SECRET_KEY", "super-secret-key")
 )
 
+# ================= Firebase初期化 =================
+cred = credentials.Certificate("firebase-key.json")
+firebase_admin.initialize_app(cred)
+
 clients = {}
 
-# ================= OAuth =================
-oauth = OAuth()
-
-oauth.register(
-    name="github",
-    client_id=os.getenv("GITHUB_CLIENT_ID"),
-    client_secret=os.getenv("GITHUB_CLIENT_SECRET"),
-    access_token_url="https://github.com/login/oauth/access_token",
-    authorize_url="https://github.com/login/oauth/authorize",
-    api_base_url="https://api.github.com/",
-    client_kwargs={"scope": "user:email"},
-)
-
-# ================= login =================
-@app.get("/login")
-async def login(request: Request):
-    redirect_uri = request.url_for("auth_callback")
-    return await oauth.github.authorize_redirect(request, redirect_uri)
-
-# ================= callback =================
-@app.get("/auth/callback")
-async def auth_callback(request: Request):
-    token = await oauth.github.authorize_access_token(request)
-
-    resp = await oauth.github.get("user", token=token)
-    user = resp.json()
-
-    user_id = str(user["id"])
-    name = user["login"]
-    icon = user["avatar_url"]
-
-    create_user(user_id, name, icon)
-
-    request.session["user"] = user_id
-    request.session["username"] = name  # ←重要
-
-    return RedirectResponse("/")
+# ================= ユーザー検証 =================
+def verify_token(token: str):
+    if not token:
+        return None
+    try:
+        decoded = auth.verify_id_token(token)
+        return decoded
+    except:
+        return None
 
 # ================= home =================
 @app.get("/")
 async def home(request: Request):
-    if not request.session.get("user"):
-        return HTMLResponse("""
-        <h2>ログインしてください</h2>
-        <a href="/login">GitHubでログイン</a>
-        """)
-
-    return RedirectResponse("/app")
+    return HTMLResponse("""
+    <h2>Real Note</h2>
+    <a href="/app">アプリへ</a>
+    """)
 
 # ================= app =================
 @app.get("/app")
-async def app_page(request: Request):
-    user_id = request.session.get("user")
-
-    if not user_id:
-        return RedirectResponse("/")
-
-    user = get_user(user_id)
-
-    # 🔥 DBズレ対策
-    if not user:
-        print("ユーザー取得失敗 → 再作成")
-        username = request.session.get("username", "User")
-        create_user(user_id, username, "")
-        user = get_user(user_id)
-
-    username = request.session.get("username", user[1])
-
+async def app_page():
     html = open("index.html", encoding="utf-8").read()
-
-    html = html.replace(
-        "let username = null;",
-        f'let username = "{username}";'
-    )
-
     return HTMLResponse(html)
-
-# ================= rooms =================
-@app.get("/rooms")
-def get_rooms_api():
-    return get_rooms()
-
-# ================= join =================
-@app.post("/join-room")
-async def join_room(data: dict):
-    room = data["room"]
-    password = data["password"]
-    room_type = data["room_type"]
-
-    return join_or_create_room(room, password, room_type)
 
 # ================= websocket =================
 @app.websocket("/ws/{room}")
 async def websocket(ws: WebSocket, room: str):
     await ws.accept()
 
+    # 🔐 Firebaseトークン取得
+    token = ws.query_params.get("token")
+    user = verify_token(token)
+
+    if not user:
+        await ws.close()
+        return
+
+    user_id = user["uid"]
+    username = user.get("name", "User")
+
+    # room初期化
     if room not in clients:
         clients[room] = []
 
@@ -128,6 +78,7 @@ async def websocket(ws: WebSocket, room: str):
         while True:
             data = await ws.receive_json()
 
+            # ===== ノート更新 =====
             if data["type"] == "update":
                 save_note(room, data["text"])
 
@@ -138,10 +89,14 @@ async def websocket(ws: WebSocket, room: str):
                             "text": data["text"]
                         })
 
+            # ===== 入力中 =====
             if data["type"] == "typing":
                 for client in clients[room]:
                     if client != ws:
-                        await client.send_json(data)
+                        await client.send_json({
+                            "type": "typing",
+                            "user": username
+                        })
 
     except:
         if ws in clients[room]:

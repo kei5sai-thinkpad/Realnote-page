@@ -83,6 +83,14 @@ async def app_page(request: Request):
 
     user = get_user(user_id)
 
+    # 👇 これ超重要
+    if not user:
+        username = request.session.get("username", "User")
+
+        create_user(user_id, username, "")
+
+        user = get_user(user_id)
+
     html = open("index.html", encoding="utf-8").read()
 
     html = html.replace(

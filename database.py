@@ -11,6 +11,16 @@ def init_db():
     conn = get_conn()
     cur = conn.cursor()
 
+    # 👤 users
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        icon TEXT
+    )
+    """)
+
+    # 🏠 rooms
     cur.execute("""
     CREATE TABLE IF NOT EXISTS rooms (
         name TEXT PRIMARY KEY,
@@ -19,6 +29,7 @@ def init_db():
     )
     """)
 
+    # 📝 notes
     cur.execute("""
     CREATE TABLE IF NOT EXISTS notes (
         room TEXT PRIMARY KEY,
@@ -28,6 +39,29 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+# ================= users =================
+def create_user(user_id, name, icon):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT OR REPLACE INTO users (id, name, icon)
+    VALUES (?, ?, ?)
+    """, (user_id, name, icon))
+
+    conn.commit()
+    conn.close()
+
+def get_user(user_id):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM users WHERE id=?", (user_id,))
+    user = cur.fetchone()
+
+    conn.close()
+    return user
 
 # ================= rooms =================
 def get_rooms():

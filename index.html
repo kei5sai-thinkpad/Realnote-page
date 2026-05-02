@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -16,6 +14,7 @@ body {
     height: 100vh;
 }
 
+/* ===== sidebar ===== */
 .sidebar {
     width: 280px;
     background: #020617;
@@ -35,6 +34,7 @@ body {
     background: #1e293b;
 }
 
+/* ===== main ===== */
 .main {
     flex: 1;
     display: flex;
@@ -58,6 +58,7 @@ body {
     white-space: pre-wrap;
     font-size: 16px;
     line-height: 1.6;
+    background: #0f172a;
 }
 
 .typing {
@@ -82,8 +83,10 @@ button {
 }
 </style>
 </head>
+
 <body>
 
+<!-- ===== sidebar ===== -->
 <div class="sidebar">
     <h2>Rooms</h2>
     <div id="rooms"></div>
@@ -96,15 +99,22 @@ button {
     </select>
 
     <button onclick="accessRoom()">入室 / 作成</button>
+
+    <hr>
+
+    <!-- Firebaseログイン -->
+    <button onclick="loginGoogle()">Googleログイン</button>
+    <div id="userInfo"></div>
 </div>
 
+<!-- ===== main ===== -->
 <div class="main">
     <div class="header">
         <span id="currentRoom">未接続</span>
 
         <div style="display:flex; gap:10px; align-items:center;">
             <button onclick="copyInviteLink()" style="width:auto;">
-                招待リンク生成
+                招待リンク
             </button>
 
             <span id="modeLabel"></span>
@@ -112,131 +122,53 @@ button {
     </div>
 
     <div id="note" contenteditable="true">
-    ノートに入室した時に表示されます
-</div>
+        ログインして部屋に入室してください
+    </div>
+
     <div class="typing" id="typing"></div>
 </div>
 
-<script>
-let username = null;   
+<script type="module">
+/* ================= Firebase ================= */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import {
+    getAuth,
+    signInWithPopup,
+    GoogleAuthProvider
+} from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+let token = null;
+let username = null;
+
+/* ================= login ================= */
+window.loginGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+
+    const user = result.user;
+    token = await user.getIdToken();
+
+    username = user.displayName;
+
+    document.getElementById("userInfo").innerText =
+        "👤 " + username;
+
+    alert("ログイン成功");
+};
+
+/* ================= WebSocket ================= */
 let ws;
 let isUpdating = false;
 let currentRoomName = "";
-
-let username = localStorage.getItem("notecord_username");
-
-if (!username) {
-    username = prompt("ユーザー名を入力してください");
-
-    if (!username || username.trim() === "") {
-        username = "User" + Math.floor(Math.random() * 1000);
-    }
-
-    localStorage.setItem("notecord_username", username);
-}
-
-function escapeHtml(text) {
-    const div = document.createElement("div");
-    div.innerText = text;
-    return div.innerHTML;
-}
-
-function formatCodeBlocks(text) {
-    const regex = new RegExp(
-        "```([a-zA-Z0-9]+)?\\n([\\s\\S]*?)```",
-        "g"
-    );
-
-    return text.replace(regex, function(match, lang, code) {
-        return `
-            <div style="
-                background:#111827;
-                border:1px solid #334155;
-                border-radius:14px;
-                margin:14px 0;
-                overflow:hidden;
-            ">
-                <div style="
-                    background:#0b1220;
-                    padding:10px 14px;
-                    border-bottom:1px solid #334155;
-                    font-size:13px;
-                    font-weight:bold;
-                    color:#cbd5e1;
-                ">
-                    ${lang || "code"}
-                </div>
-
-                <pre style="
-                    margin:0;
-                    padding:16px;
-                    font-family:Consolas, monospace;
-                    font-size:14px;
-                    line-height:1.7;
-                    white-space:pre-wrap;
-                    overflow-x:auto;
-                    color:white;
-                ">${escapeHtml(code)}</pre>
-            </div>
-        `;
-    });
-}
-
-async function loadRooms() {
-    const res = await fetch("/rooms");
-    const rooms = await res.json();
-
-    const container = document.getElementById("rooms");
-    container.innerHTML = "";
-
-    rooms.forEach(room => {
-        const div = document.createElement("div");
-        div.className = "room";
-        div.innerText = room.name + " (" + room.label + ")";
-        div.onclick = () => quickJoin(room.name);
-        container.appendChild(div);
-    });
-}
-
-function quickJoin(name) {
-    document.getElementById("roomInput").value = name;
-    accessRoom();
-}
-
-async function accessRoom() {
-    const room = document.getElementById("roomInput").value.trim();
-    const type = document.getElementById("roomType").value;
-
-    if (!room) {
-        alert("部屋名を入力してください");
-        return;
-    }
-
-    const password = prompt("パスワード（空でもOK）を入力してください") || "";
-
-    const res = await fetch("/join-room", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            room: room,
-            password: password,
-            room_type: type,
-            username: username
-        })
-    });
-
-    const result = await res.json();
-
-    if (!result.success) {
-        alert(result.message);
-        return;
-    }
-
-    connectRoom(room, result.can_edit, result.label);
-    loadRooms();
-}
 
 function connectRoom(room, canEdit, label) {
     currentRoomName = room;
@@ -251,7 +183,7 @@ function connectRoom(room, canEdit, label) {
 
     ws = new WebSocket(
         (location.protocol === "https:" ? "wss://" : "ws://")
-        + location.host + "/ws/" + room
+        + location.host + "/ws/" + room + "?token=" + token
     );
 
     ws.onmessage = (event) => {
@@ -259,7 +191,7 @@ function connectRoom(room, canEdit, label) {
 
         if (data.type === "init" || data.type === "update") {
             isUpdating = true;
-            note.innerHTML = formatCodeBlocks(data.text);
+            note.innerText = data.text;
             isUpdating = false;
         }
 
@@ -273,11 +205,7 @@ function connectRoom(room, canEdit, label) {
     note.oninput = () => {
         if (!canEdit) return;
 
-        if (
-            ws &&
-            ws.readyState === WebSocket.OPEN &&
-            !isUpdating
-        ) {
+        if (ws && ws.readyState === WebSocket.OPEN && !isUpdating) {
             ws.send(JSON.stringify({
                 type: "update",
                 text: note.innerText
@@ -291,37 +219,77 @@ function connectRoom(room, canEdit, label) {
     };
 }
 
-/* 招待リンク */
+/* ================= rooms ================= */
+async function loadRooms() {
+    const res = await fetch("/rooms");
+    const rooms = await res.json();
 
-function copyInviteLink() {
-    if (!currentRoomName) {
-        alert("先に部屋へ入室してください");
+    const container = document.getElementById("rooms");
+    container.innerHTML = "";
+
+    rooms.forEach(room => {
+        const div = document.createElement("div");
+        div.className = "room";
+        div.innerText = room.name + " (" + room.label + ")";
+        div.onclick = () => {
+            document.getElementById("roomInput").value = room.name;
+            accessRoom();
+        };
+        container.appendChild(div);
+    });
+}
+
+window.accessRoom = async () => {
+    if (!token) {
+        alert("先にGoogleログインしてください");
         return;
     }
 
-    const inviteLink =
-        location.origin + "/?room=" + encodeURIComponent(currentRoomName);
+    const room = document.getElementById("roomInput").value.trim();
+    const type = document.getElementById("roomType").value;
 
-    navigator.clipboard.writeText(inviteLink)
-        .then(() => {
-            alert("招待リンクをコピーしました！");
+    if (!room) return alert("部屋名を入力してください");
+
+    const res = await fetch("/join-room", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            room,
+            password: "",
+            room_type: type
         })
-        .catch(() => {
-            alert("コピーに失敗しました");
-        });
-}
+    });
 
-/* URLから自動入室 */
+    const result = await res.json();
 
+    if (!result.success) {
+        alert(result.message);
+        return;
+    }
+
+    connectRoom(room, result.can_edit, result.label);
+    loadRooms();
+};
+
+/* ================= invite ================= */
+window.copyInviteLink = () => {
+    if (!currentRoomName) return alert("先に部屋へ入室");
+
+    const link = location.origin + "/?room=" + currentRoomName;
+
+    navigator.clipboard.writeText(link);
+    alert("コピーしました");
+};
+
+/* ================= auto join ================= */
 window.onload = async () => {
     await loadRooms();
 
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     const room = params.get("room");
 
     if (room) {
         document.getElementById("roomInput").value = room;
-        accessRoom();
     }
 };
 </script>

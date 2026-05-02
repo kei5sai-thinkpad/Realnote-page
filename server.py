@@ -1,141 +1,129 @@
-from fastapi import FastAPI, Request, WebSocket
-from fastapi.responses import HTMLResponse, RedirectResponse
-from starlette.middleware.sessions import SessionMiddleware
-from authlib.integrations.starlette_client import OAuth
+import sqlite3
 import os
 
-from database import *
+DB = os.path.join(os.path.dirname(__file__), "app.db")
 
-init_db()
+def get_conn():
+    return sqlite3.connect(DB)
 
-app = FastAPI()
+def init_db():
+    conn = get_conn()
+    cur = conn.cursor()
 
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=os.getenv("SECRET_KEY", "super-secret-key")
-)
-
-clients = {}
-
-# ================= OAuth =================
-oauth = OAuth()
-
-oauth.register(
-    name="github",
-    client_id=os.getenv("GITHUB_CLIENT_ID"),
-    client_secret=os.getenv("GITHUB_CLIENT_SECRET"),
-    access_token_url="https://github.com/login/oauth/access_token",
-    authorize_url="https://github.com/login/oauth/authorize",
-    api_base_url="https://api.github.com/",
-    client_kwargs={"scope": "user:email"},
-)
-
-# ================= login =================
-@app.get("/login")
-async def login(request: Request):
-    redirect_uri = request.url_for("auth_callback")
-    return await oauth.github.authorize_redirect(request, redirect_uri)
-
-# ================= callback =================
-@app.get("/auth/callback")
-async def auth_callback(request: Request):
-    token = await oauth.github.authorize_access_token(request)
-
-    resp = await oauth.github.get("user", token=token)
-    user = resp.json()
-
-    user_id = str(user["id"])
-    name = user["login"]
-    icon = user["avatar_url"]
-
-    create_user(user_id, name, icon)
-
-    request.session["user"] = user_id
-
-    return RedirectResponse("/")
-
-# ================= home =================
-@app.get("/")
-async def home(request: Request):
-    if not request.session.get("user"):
-        return HTMLResponse("""
-        <h2>ログインしてください</h2>
-        <a href="/login">GitHubでログイン</a>
-        """)
-
-    return RedirectResponse("/app")
-
-# ================= app =================
-@app.get("/app")
-async def app_page(request: Request):
-    user_id = request.session.get("user")
-
-    if not user_id:
-        return RedirectResponse("/")
-
-    user = get_user(user_id)
-
-    if not user:
-        return HTMLResponse("ユーザー取得失敗（DB確認して）")
-
-    html = open("index.html", encoding="utf-8").read()
-
-    html = html.replace(
-        "let username = null;",
-        f'let username = "{user[1]}";'
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        icon TEXT
     )
+    """)
 
-    return HTMLResponse(html)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS rooms (
+        name TEXT PRIMARY KEY,
+        password TEXT,
+        type TEXT
+    )
+    """)
 
-# ================= rooms =================
-@app.get("/rooms")
-def get_rooms_api():
-    return get_rooms()
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS notes (
+        room TEXT PRIMARY KEY,
+        content TEXT
+    )
+    """)
 
-# ================= join =================
-@app.post("/join-room")
-async def join_room(data: dict):
-    room = data["room"]
-    password = data["password"]
-    room_type = data["room_type"]
+    conn.commit()
+    conn.close()
 
-    result = join_or_create_room(room, password, room_type)
+# ===== user =====
+def create_user(user_id, name, icon):
+    conn = get_conn()
+    cur = conn.cursor()
 
-    return result
+    cur.execute("""
+    INSERT OR REPLACE INTO users (id, name, icon)
+    VALUES (?, ?, ?)
+    """, (user_id, name, icon))
 
-# ================= websocket =================
-@app.websocket("/ws/{room}")
-async def websocket(ws: WebSocket, room: str):
-    await ws.accept()
+    conn.commit()
+    conn.close()
 
-    if room not in clients:
-        clients[room] = []
+def get_user(user_id):
+    conn = get_conn()
+    cur = conn.cursor()
 
-    clients[room].append(ws)
+    cur.execute("SELECT * FROM users WHERE id=?", (user_id,))
+    user = cur.fetchone()
 
-    await ws.send_json({
-        "type": "init",
-        "text": get_note(room)
-    })
+    conn.close()
+    return user
 
-    try:
-        while True:
-            data = await ws.receive_json()
+# ===== rooms =====
+def get_rooms():
+    conn = get_conn()
+    cur = conn.cursor()
 
-            if data["type"] == "update":
-                save_note(room, data["text"])
+    cur.execute("SELECT name, type FROM rooms")
+    rows = cur.fetchall()
 
-                for client in clients[room]:
-                    if client != ws:
-                        await client.send_json({
-                            "type": "update",
-                            "text": data["text"]
-                        })
+    conn.close()
 
-            if data["type"] == "typing":
-                for client in clients[room]:
-                    if client != ws:
-                        await client.send_json(data)
+    return [
+        {"name": r[0], "label": "閲覧専用" if r[1]=="readonly" else "共有"}
+        for r in rows
+    ]
 
-    except:
-        clients[room].remove(ws)
+def join_or_create_room(name, password, room_type):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT password, type FROM rooms WHERE name=?", (name,))
+    room = cur.fetchone()
+
+    if room:
+        if room[0] != password:
+            conn.close()
+            return {"success": False, "message": "パスワード違う"}
+
+        conn.close()
+        return {
+            "success": True,
+            "can_edit": room[1] == "shared",
+            "label": "閲覧専用" if room[1]=="readonly" else "共有"
+        }
+
+    cur.execute("INSERT INTO rooms VALUES (?, ?, ?)", (name, password, room_type))
+    cur.execute("INSERT INTO notes VALUES (?, ?)", (name, ""))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "can_edit": room_type == "shared",
+        "label": "閲覧専用" if room_type=="readonly" else "共有"
+    }
+
+# ===== notes =====
+def get_note(room):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT content FROM notes WHERE room=?", (room,))
+    row = cur.fetchone()
+
+    conn.close()
+    return row[0] if row else ""
+
+def save_note(room, text):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT OR REPLACE INTO notes (room, content)
+    VALUES (?, ?)
+    """, (room, text))
+
+    conn.commit()
+    conn.close()

@@ -37,9 +37,11 @@ async def login_github(request: Request):
 # ================= callback =================
 @app.get("/auth/callback")
 async def auth_callback(request: Request):
-    token = await oauth.github.authorize_access_token(request)
-    resp = await oauth.github.get("user", token=token)
-    user = resp.json()
+    try:
+        token = await oauth.github.authorize_access_token(request)
+        return {"token": token}
+    except Exception as e:
+        return {"error": str(e)}
 
     user_id = str(user["id"])
     name = user["login"]

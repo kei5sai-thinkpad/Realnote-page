@@ -1,17 +1,11 @@
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
+from authlib.integrations.starlette_client import OAuth
 import os
 
-from database import (
-    init_db,
-    get_rooms,
-    join_or_create_room,
-    get_note,
-    save_note
-)
+from database import *
 
-# ================= 初期化 =================
 init_db()
 
 app = FastAPI()
@@ -21,74 +15,53 @@ app.add_middleware(
     secret_key=os.getenv("SECRET_KEY", "super-secret-key")
 )
 
-clients = {}
+# ================= OAuth設定 =================
+oauth = OAuth()
 
-# ================= root =================
-@app.get("/")
-async def root():
+oauth.register(
+    name="github",
+    client_id=os.getenv("GITHUB_CLIENT_ID"),
+    client_secret=os.getenv("GITHUB_CLIENT_SECRET"),
+    access_token_url="https://github.com/login/oauth/access_token",
+    authorize_url="https://github.com/login/oauth/authorize",
+    api_base_url="https://api.github.com/",
+    client_kwargs={"scope": "user:email"},
+)
+
+# ================= GitHubログイン開始 =================
+@app.get("/login/github")
+async def login_github(request: Request):
+    redirect_uri = request.url_for("auth_callback")
+    return await oauth.github.authorize_redirect(request, redirect_uri)
+
+# ================= callback =================
+@app.get("/auth/callback")
+async def auth_callback(request: Request):
+    token = await oauth.github.authorize_access_token(request)
+    resp = await oauth.github.get("user", token=token)
+    user = resp.json()
+
+    user_id = str(user["id"])
+    name = user["login"]
+    icon = user["avatar_url"]
+
+    create_user(user_id, name, icon)
+
+    request.session["user"] = user_id
+    request.session["username"] = name
+
     return RedirectResponse("/app")
 
+# ================= app =================
 @app.get("/app")
-async def app_page():
+async def app_page(request: Request):
+    if not request.session.get("user"):
+        return RedirectResponse("/")
+
     with open("index.html", encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+        html = f.read()
 
-# ================= rooms =================
-@app.get("/rooms")
-def rooms():
-    return get_rooms()
+    username = request.session.get("username", "User")
+    html = html.replace("{{username}}", username)
 
-# ================= join =================
-@app.post("/join-room")
-async def join_room(data: dict):
-    room = data.get("room")
-    password = data.get("password", "")
-    room_type = data.get("room_type", "shared")
-
-    if not room:
-        return {"success": False, "message": "room required"}
-
-    return join_or_create_room(room, password, room_type)
-
-# ================= websocket =================
-@app.websocket("/ws/{room}")
-async def ws_endpoint(ws: WebSocket, room: str):
-    await ws.accept()
-
-    if room not in clients:
-        clients[room] = set()
-
-    clients[room].add(ws)
-
-    await ws.send_json({
-        "type": "init",
-        "text": get_note(room)
-    })
-
-    try:
-        while True:
-            data = await ws.receive_json()
-
-            if data["type"] == "update":
-                save_note(room, data["text"])
-
-                for c in list(clients[room]):
-                    if c != ws:
-                        await c.send_json({
-                            "type": "update",
-                            "text": data["text"]
-                        })
-
-            elif data["type"] == "typing":
-                for c in list(clients[room]):
-                    if c != ws:
-                        await c.send_json({
-                            "type": "typing",
-                            "user": data.get("user", "User")
-                        })
-
-    except WebSocketDisconnect:
-        clients[room].discard(ws)
-
-        if not clients[room]:
-            del clients[room]
+    return HTMLResponse(html)

@@ -1,13 +1,10 @@
 import sqlite3
 import os
 
-# ===== DBパス（絶対これだけにする）=====
 DB = os.path.join(os.path.dirname(__file__), "app.db")
-
 
 def get_conn():
     return sqlite3.connect(DB)
-
 
 def init_db():
     conn = get_conn()
@@ -39,7 +36,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-
 # ===== user =====
 def create_user(user_id, name, icon):
     conn = get_conn()
@@ -53,7 +49,6 @@ def create_user(user_id, name, icon):
     conn.commit()
     conn.close()
 
-
 def get_user(user_id):
     conn = get_conn()
     cur = conn.cursor()
@@ -61,11 +56,8 @@ def get_user(user_id):
     cur.execute("SELECT * FROM users WHERE id=?", (user_id,))
     user = cur.fetchone()
 
-    print("DEBUG USER:", user)  # ←ログ確認用
-
     conn.close()
     return user
-
 
 # ===== rooms =====
 def get_rooms():
@@ -81,7 +73,6 @@ def get_rooms():
         {"name": r[0], "label": "閲覧専用" if r[1]=="readonly" else "共有"}
         for r in rows
     ]
-
 
 def join_or_create_room(name, password, room_type):
     conn = get_conn()
@@ -114,7 +105,6 @@ def join_or_create_room(name, password, room_type):
         "label": "閲覧専用" if room_type=="readonly" else "共有"
     }
 
-
 # ===== notes =====
 def get_note(room):
     conn = get_conn()
@@ -124,9 +114,7 @@ def get_note(room):
     row = cur.fetchone()
 
     conn.close()
-
     return row[0] if row else ""
-
 
 def save_note(room, text):
     conn = get_conn()

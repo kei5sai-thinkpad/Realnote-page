@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, WebSocket
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from authlib.integrations.starlette_client import OAuth
@@ -41,7 +41,6 @@ async def login(request: Request):
 @app.get("/auth/callback")
 async def auth_callback(request: Request):
     token = await oauth.github.authorize_access_token(request)
-
     resp = await oauth.github.get("user", token=token)
     user = resp.json()
 
@@ -52,9 +51,9 @@ async def auth_callback(request: Request):
     create_user(user_id, name, icon)
 
     request.session["user"] = user_id
-    request.session["username"] = name  # ←重要
+    request.session["username"] = name
 
-    return RedirectResponse("/")
+    return RedirectResponse("/app")
 
 # ================= home =================
 @app.get("/")
@@ -77,9 +76,7 @@ async def app_page(request: Request):
 
     user = get_user(user_id)
 
-    # 🔥 DBズレ対策
     if not user:
-        print("ユーザー取得失敗 → 再作成")
         username = request.session.get("username", "User")
         create_user(user_id, username, "")
         user = get_user(user_id)
@@ -104,14 +101,14 @@ def get_rooms_api():
 @app.post("/join-room")
 async def join_room(data: dict):
     room = data["room"]
-    password = data["password"]
+    password = data.get("password", "")
     room_type = data["room_type"]
 
     return join_or_create_room(room, password, room_type)
 
 # ================= websocket =================
 @app.websocket("/ws/{room}")
-async def websocket(ws: WebSocket, room: str):
+async def websocket_endpoint(ws: WebSocket, room: str):
     await ws.accept()
 
     if room not in clients:
@@ -128,6 +125,7 @@ async def websocket(ws: WebSocket, room: str):
         while True:
             data = await ws.receive_json()
 
+            # ===== ノート更新 =====
             if data["type"] == "update":
                 save_note(room, data["text"])
 
@@ -138,11 +136,15 @@ async def websocket(ws: WebSocket, room: str):
                             "text": data["text"]
                         })
 
+            # ===== typing =====
             if data["type"] == "typing":
                 for client in clients[room]:
                     if client != ws:
-                        await client.send_json(data)
+                        await client.send_json({
+                            "type": "typing",
+                            "user": data.get("user", "User")
+                        })
 
-    except:
-        if ws in clients[room]:
+    except WebSocketDisconnect:
+        if room in clients and ws in clients[room]:
             clients[room].remove(ws)

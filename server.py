@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Header, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from authlib.integrations.starlette_client import OAuth
 import os
+import requests
 
 from database import *
 
@@ -18,7 +19,7 @@ app.add_middleware(
 
 clients = {}
 
-# ================= OAuth =================
+# ================= GitHub OAuth（そのまま残す） =================
 oauth = OAuth()
 
 oauth.register(
@@ -30,6 +31,27 @@ oauth.register(
     api_base_url="https://api.github.com/",
     client_kwargs={"scope": "user:email"},
 )
+
+# ================= Supabase設定 =================
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+
+# ================= Supabaseトークン検証 =================
+def verify_supabase_token(token: str):
+    if not token:
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "apikey": SUPABASE_ANON_KEY
+    }
+
+    res = requests.get(f"{SUPABASE_URL}/auth/v1/user", headers=headers)
+
+    if res.status_code != 200:
+        return None
+
+    return res.json()
 
 # ================= login =================
 @app.get("/login")
@@ -54,6 +76,22 @@ async def auth_callback(request: Request):
     request.session["username"] = name
 
     return RedirectResponse("/app")
+
+# ================= Supabaseログイン用エンドポイント =================
+@app.post("/auth/supabase")
+async def supabase_login(data: dict):
+    token = data.get("token")
+
+    user = verify_supabase_token(token)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="invalid token")
+
+    return {
+        "success": True,
+        "user_id": user["id"],
+        "email": user["email"]
+    }
 
 # ================= home =================
 @app.get("/")
@@ -125,7 +163,6 @@ async def websocket_endpoint(ws: WebSocket, room: str):
         while True:
             data = await ws.receive_json()
 
-            # ===== ノート更新 =====
             if data["type"] == "update":
                 save_note(room, data["text"])
 
@@ -136,7 +173,6 @@ async def websocket_endpoint(ws: WebSocket, room: str):
                             "text": data["text"]
                         })
 
-            # ===== typing =====
             if data["type"] == "typing":
                 for client in clients[room]:
                     if client != ws:

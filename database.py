@@ -1,12 +1,16 @@
 import sqlite3
-import sqlite3
 import os
 
+# ===== DBパス（絶対これだけにする）=====
 DB = os.path.join(os.path.dirname(__file__), "app.db")
-DB = "app.db"
+
+
+def get_conn():
+    return sqlite3.connect(DB)
+
 
 def init_db():
-    conn = sqlite3.connect(DB)
+    conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("""
@@ -35,31 +39,37 @@ def init_db():
     conn.commit()
     conn.close()
 
+
 # ===== user =====
 def create_user(user_id, name, icon):
-    conn = sqlite3.connect(DB)
+    conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("""
-    INSERT OR IGNORE INTO users VALUES (?, ?, ?)
+    INSERT OR REPLACE INTO users (id, name, icon)
+    VALUES (?, ?, ?)
     """, (user_id, name, icon))
 
     conn.commit()
     conn.close()
 
+
 def get_user(user_id):
-    conn = sqlite3.connect(DB)
+    conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("SELECT * FROM users WHERE id=?", (user_id,))
     user = cur.fetchone()
 
+    print("DEBUG USER:", user)  # ←ログ確認用
+
     conn.close()
     return user
 
+
 # ===== rooms =====
 def get_rooms():
-    conn = sqlite3.connect(DB)
+    conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("SELECT name, type FROM rooms")
@@ -72,8 +82,9 @@ def get_rooms():
         for r in rows
     ]
 
+
 def join_or_create_room(name, password, room_type):
-    conn = sqlite3.connect(DB)
+    conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("SELECT password, type FROM rooms WHERE name=?", (name,))
@@ -81,8 +92,10 @@ def join_or_create_room(name, password, room_type):
 
     if room:
         if room[0] != password:
+            conn.close()
             return {"success": False, "message": "パスワード違う"}
 
+        conn.close()
         return {
             "success": True,
             "can_edit": room[1] == "shared",
@@ -101,9 +114,10 @@ def join_or_create_room(name, password, room_type):
         "label": "閲覧専用" if room_type=="readonly" else "共有"
     }
 
+
 # ===== notes =====
 def get_note(room):
-    conn = sqlite3.connect(DB)
+    conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("SELECT content FROM notes WHERE room=?", (room,))
@@ -113,11 +127,15 @@ def get_note(room):
 
     return row[0] if row else ""
 
+
 def save_note(room, text):
-    conn = sqlite3.connect(DB)
+    conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("UPDATE notes SET content=? WHERE room=?", (text, room))
+    cur.execute("""
+    INSERT OR REPLACE INTO notes (room, content)
+    VALUES (?, ?)
+    """, (room, text))
 
     conn.commit()
     conn.close()

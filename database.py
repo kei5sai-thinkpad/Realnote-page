@@ -1,11 +1,11 @@
 import sqlite3
 import os
 
-DB = os.path.join(os.path.dirname(__file__), "app.db")
+# 💥 絶対パス（ここが超重要）
+DB = os.path.abspath(os.path.join(os.path.dirname(__file__), "app.db"))
 
-# ================= 接続（安定版） =================
+# ================= 接続 =================
 def get_conn():
-    # FastAPI + WebSocket 安定化
     return sqlite3.connect(DB, check_same_thread=False)
 
 # ================= 初期化 =================
@@ -80,24 +80,22 @@ def get_rooms():
         for r in rows
     ]
 
-# ================= room create/join（完全安定版） =================
+# ================= join / create =================
 def join_or_create_room(name, password, room_type):
     conn = get_conn()
     cur = conn.cursor()
 
     try:
-        # ルーム取得
         cur.execute(
             "SELECT password, type FROM rooms WHERE name=?",
             (name,)
         )
         room = cur.fetchone()
 
-        # ================= 既存ルーム =================
+        # ================= 既存 =================
         if room:
             saved_password, saved_type = room
 
-            # パスワードチェック（空OK）
             if saved_password and saved_password != (password or ""):
                 return {
                     "success": False,
@@ -110,7 +108,7 @@ def join_or_create_room(name, password, room_type):
                 "label": "閲覧専用" if saved_type == "readonly" else "共有"
             }
 
-        # ================= 新規作成 =================
+        # ================= 新規 =================
         cur.execute("""
         INSERT INTO rooms (name, password, type)
         VALUES (?, ?, ?)

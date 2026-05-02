@@ -4,3 +4,4 @@ authlib
 itsdangerous
 python-dotenv
 httpx
+firebase-admin

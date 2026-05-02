@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from starlette.middleware.sessions import SessionMiddleware
 import os
 
@@ -9,6 +9,7 @@ init_db()
 
 app = FastAPI()
 
+# ================= セッション =================
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SECRET_KEY", "super-secret-key")
@@ -16,12 +17,22 @@ app.add_middleware(
 
 clients = {}
 
+# ================= BASE PATH =================
+BASE_DIR = os.path.dirname(__file__)
+
+# ================= HTML =================
+@app.get("/app")
+async def app_page():
+    html_path = os.path.join(BASE_DIR, "index.html")
+    with open(html_path, encoding="utf-8") as f:
+        return HTMLResponse(f.read())
+
 # ================= rooms =================
 @app.get("/rooms")
 def rooms():
     return get_rooms()
 
-# ================= join =================
+# ================= join / create =================
 @app.post("/join-room")
 async def join_room(data: dict):
     room = data.get("room")
@@ -35,7 +46,7 @@ async def join_room(data: dict):
 
 # ================= websocket =================
 @app.websocket("/ws/{room}")
-async def ws(ws: WebSocket, room: str):
+async def ws_endpoint(ws: WebSocket, room: str):
     await ws.accept()
 
     clients.setdefault(room, set()).add(ws)
@@ -49,6 +60,7 @@ async def ws(ws: WebSocket, room: str):
         while True:
             data = await ws.receive_json()
 
+            # ===== update =====
             if data["type"] == "update":
                 save_note(room, data["text"])
 
@@ -59,6 +71,7 @@ async def ws(ws: WebSocket, room: str):
                             "text": data["text"]
                         })
 
+            # ===== typing =====
             elif data["type"] == "typing":
                 for c in list(clients[room]):
                     if c != ws:

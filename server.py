@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Header, HTTPException
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from authlib.integrations.starlette_client import OAuth
@@ -17,9 +17,9 @@ app.add_middleware(
     secret_key=os.getenv("SECRET_KEY", "super-secret-key")
 )
 
-clients = {}
+clients = {}  # room -> set(ws)
 
-# ================= GitHub OAuth（そのまま残す） =================
+# ================= GitHub OAuth =================
 oauth = OAuth()
 
 oauth.register(
@@ -32,11 +32,10 @@ oauth.register(
     client_kwargs={"scope": "user:email"},
 )
 
-# ================= Supabase設定 =================
-SUPABASE_URL = os.getenv("https://qwoasmceczpcvkuufvkt.supabase.co")
-SUPABASE_ANON_KEY = os.getenv("sb_publishable_U3eBuQImXzRhe7irveKkYQ_cw0RVyem")
+# ================= Supabase（ここ重要修正） =================
+SUPABASE_URL = "https://qwoasmceczpcvkuufvkt.supabase.co"
+SUPABASE_ANON_KEY = "sb_publishable_U3eBuQImXzRhe7irveKkYQ_cw0RVyem"
 
-# ================= Supabaseトークン検証 =================
 def verify_supabase_token(token: str):
     if not token:
         return None
@@ -46,20 +45,22 @@ def verify_supabase_token(token: str):
         "apikey": SUPABASE_ANON_KEY
     }
 
-    res = requests.get(f"{SUPABASE_URL}/auth/v1/user", headers=headers)
+    res = requests.get(
+        f"{SUPABASE_URL}/auth/v1/user",
+        headers=headers
+    )
 
     if res.status_code != 200:
         return None
 
     return res.json()
 
-# ================= login =================
+# ================= GitHub login =================
 @app.get("/login")
 async def login(request: Request):
     redirect_uri = request.url_for("auth_callback")
     return await oauth.github.authorize_redirect(request, redirect_uri)
 
-# ================= callback =================
 @app.get("/auth/callback")
 async def auth_callback(request: Request):
     token = await oauth.github.authorize_access_token(request)
@@ -77,7 +78,7 @@ async def auth_callback(request: Request):
 
     return RedirectResponse("/app")
 
-# ================= Supabaseログイン用エンドポイント =================
+# ================= Supabase login =================
 @app.post("/auth/supabase")
 async def supabase_login(data: dict):
     token = data.get("token")
@@ -90,7 +91,7 @@ async def supabase_login(data: dict):
     return {
         "success": True,
         "user_id": user["id"],
-        "email": user["email"]
+        "email": user.get("email")
     }
 
 # ================= home =================
@@ -135,7 +136,6 @@ async def app_page(request: Request):
 def get_rooms_api():
     return get_rooms()
 
-# ================= join =================
 @app.post("/join-room")
 async def join_room(data: dict):
     room = data["room"]
@@ -150,9 +150,9 @@ async def websocket_endpoint(ws: WebSocket, room: str):
     await ws.accept()
 
     if room not in clients:
-        clients[room] = []
+        clients[room] = set()
 
-    clients[room].append(ws)
+    clients[room].add(ws)
 
     await ws.send_json({
         "type": "init",
@@ -163,18 +163,20 @@ async def websocket_endpoint(ws: WebSocket, room: str):
         while True:
             data = await ws.receive_json()
 
+            # ===== 更新 =====
             if data["type"] == "update":
                 save_note(room, data["text"])
 
-                for client in clients[room]:
+                for client in list(clients[room]):
                     if client != ws:
                         await client.send_json({
                             "type": "update",
                             "text": data["text"]
                         })
 
-            if data["type"] == "typing":
-                for client in clients[room]:
+            # ===== typing =====
+            elif data["type"] == "typing":
+                for client in list(clients[room]):
                     if client != ws:
                         await client.send_json({
                             "type": "typing",
@@ -182,5 +184,7 @@ async def websocket_endpoint(ws: WebSocket, room: str):
                         })
 
     except WebSocketDisconnect:
-        if room in clients and ws in clients[room]:
-            clients[room].remove(ws)
+        clients[room].discard(ws)
+
+        if len(clients[room]) == 0:
+            del clients[room]

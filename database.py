@@ -11,6 +11,16 @@ def init_db():
     conn = get_conn()
     cur = conn.cursor()
 
+    # 👤 users
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        icon TEXT
+    )
+    """)
+
+    # 🏠 rooms
     cur.execute("""
     CREATE TABLE IF NOT EXISTS rooms (
         name TEXT PRIMARY KEY,
@@ -19,19 +29,11 @@ def init_db():
     )
     """)
 
+    # 📝 notes
     cur.execute("""
     CREATE TABLE IF NOT EXISTS notes (
         room TEXT PRIMARY KEY,
         content TEXT
-    )
-    """)
-
-    # 🔥 ユーザー
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        icon TEXT
     )
     """)
 
@@ -55,7 +57,7 @@ def get_user(user_id):
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("SELECT id, name, icon FROM users WHERE id=?", (user_id,))
+    cur.execute("SELECT * FROM users WHERE id=?", (user_id,))
     user = cur.fetchone()
 
     conn.close()
@@ -84,13 +86,10 @@ def join_or_create_room(name, password, room_type):
     conn = get_conn()
     cur = conn.cursor()
 
-    # 🔥 news-roomは強制readonly
-    if name == "news-room":
-        room_type = "readonly"
-
     cur.execute("SELECT password, type FROM rooms WHERE name=?", (name,))
     room = cur.fetchone()
 
+    # 既存
     if room:
         saved_password, saved_type = room
 
@@ -105,6 +104,7 @@ def join_or_create_room(name, password, room_type):
             "label": "閲覧専用" if saved_type == "readonly" else "共有"
         }
 
+    # 新規
     cur.execute(
         "INSERT INTO rooms VALUES (?, ?, ?)",
         (name, password, room_type)

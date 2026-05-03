@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from authlib.integrations.starlette_client import OAuth
 import os
+import secrets
 
 from database import *
 
@@ -10,17 +11,21 @@ init_db()
 
 app = FastAPI()
 
-# ================= セッション（ここが超重要） =================
+# ================= セッション（最重要・完全版） =================
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SECRET_KEY", "super-secret-key"),
-    same_site="lax",     # ← これ重要（CSRF回避）
-    https_only=True      # ← Render用
+
+    # iPad対策
+    same_site="none",     # ← これでSafariでもOK
+    https_only=True,      # ← 必須
+
+    max_age=60 * 60 * 24 * 30  # 30日保持
 )
 
 clients = {}
 
-# ================= OAuth =================
+# ================= OAuth（GitHub） =================
 oauth = OAuth()
 
 oauth.register(
@@ -33,7 +38,12 @@ oauth.register(
     client_kwargs={"scope": "user:email"},
 )
 
-# ================= GitHubログイン開始 =================
+# ================= ルート（ログイン強制しない） =================
+@app.get("/")
+async def home():
+    return RedirectResponse("/app")
+
+# ================= GitHubログイン =================
 @app.get("/login/github")
 async def login_github(request: Request):
     redirect_uri = request.url_for("auth_callback")
@@ -59,7 +69,7 @@ async def auth_callback(request: Request):
         return RedirectResponse("/app")
 
     except Exception as e:
-        return {"error": str(e)}
+        return HTMLResponse(f"Login Error: {str(e)}")
 
 # ================= ログアウト =================
 @app.get("/logout")
@@ -67,31 +77,31 @@ async def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/")
 
-# ================= ホーム =================
-@app.get("/")
-async def home(request: Request):
-    if not request.session.get("user"):
-        return HTMLResponse("""
-        <h2>ログイン</h2>
-        <a href="/login/github">GitHubでログイン</a>
-        """)
-    return RedirectResponse("/app")
-
-# ================= アプリ =================
+# ================= アプリ（ゲストOK） =================
 @app.get("/app")
 async def app_page(request: Request):
     user_id = request.session.get("user")
 
-    if not user_id:
-        return RedirectResponse("/")
+    # 🔥 ゲスト対応（ここが重要）
+    if user_id:
+        user = get_user(user_id)
 
-    user = get_user(user_id)
+        if not user:
+            username = request.session.get("username", "User")
+            create_user(user_id, username, "")
+            user = get_user(user_id)
+
+        username = user[1]
+
+    else:
+        # 👇 未ログインでも入れる
+        username = "Guest" + str(secrets.randbelow(1000))
 
     html = open("index.html", encoding="utf-8").read()
 
     html = html.replace(
         "let username = null;",
-        f'let username = "{user[1]}";'
+        f'let username = "{username}";'
     )
 
     return HTMLResponse(html)

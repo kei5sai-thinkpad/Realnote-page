@@ -5,73 +5,49 @@
 <title>NoteCord</title>
 
 <style>
-
-/* ===== テーマ変数 ===== */
-:root {
-    --bg: #0f172a;
-    --text: white;
-    --sidebar: #020617;
-    --card: #111827;
-    --border: #1e293b;
-}
-
-.light {
-    --bg: #f1f5f9;
-    --text: #0f172a;
-    --sidebar: #ffffff;
-    --card: #e2e8f0;
-    --border: #cbd5e1;
-}
-
-/* ===== 全体 ===== */
 body {
     margin: 0;
     font-family: sans-serif;
-    background: var(--bg);
-    color: var(--text);
+    background: #0f172a;
+    color: white;
     display: flex;
     height: 100vh;
 }
 
-/* ===== サイドバー ===== */
 .sidebar {
     width: 280px;
-    background: var(--sidebar);
+    background: #020617;
     padding: 15px;
-    border-right: 1px solid var(--border);
+    border-right: 1px solid #1e293b;
 }
 
-/* ===== ルーム ===== */
 .room {
     padding: 10px;
     border-radius: 10px;
     cursor: pointer;
     margin-bottom: 6px;
-    background: var(--card);
+    background: #111827;
 }
 
 .room:hover {
-    opacity: 0.8;
+    background: #1e293b;
 }
 
-/* ===== メイン ===== */
 .main {
     flex: 1;
     display: flex;
     flex-direction: column;
 }
 
-/* ===== ヘッダー ===== */
 .header {
-    padding: 10px 15px;
-    background: var(--sidebar);
-    border-bottom: 1px solid var(--border);
+    padding: 15px 20px;
+    background: #020617;
+    border-bottom: 1px solid #1e293b;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-/* ===== ノート ===== */
 #note {
     flex: 1;
     padding: 20px;
@@ -79,74 +55,35 @@ body {
     overflow: auto;
     white-space: pre-wrap;
     font-size: 16px;
+    line-height: 1.6;
 }
 
-/* ===== 入力中 ===== */
 .typing {
-    padding: 10px;
-    color: gray;
+    padding: 10px 20px;
+    color: #94a3b8;
+    min-height: 24px;
 }
 
-/* ===== 入力UI ===== */
 input, button, select {
     width: 100%;
     padding: 10px;
     margin-top: 10px;
     border-radius: 10px;
     border: none;
+    box-sizing: border-box;
 }
 
-/* ===== ボタン ===== */
 button {
     background: #3b82f6;
     color: white;
     cursor: pointer;
 }
-
-/* ===== ハンバーガー ===== */
-.menu-btn {
-    display: none;
-    font-size: 20px;
-    cursor: pointer;
-}
-
-/* ===== スマホ対応 ===== */
-@media (max-width: 768px) {
-
-    body {
-        flex-direction: column;
-    }
-
-    .menu-btn {
-        display: block;
-    }
-
-    .sidebar {
-        position: fixed;
-        top: 0;
-        left: -100%;
-        width: 80%;
-        height: 100%;
-        z-index: 1000;
-        transition: 0.3s;
-    }
-
-    .sidebar.open {
-        left: 0;
-    }
-
-    .main {
-        width: 100%;
-    }
-}
-
 </style>
 </head>
 
 <body>
 
-<!-- ===== サイドバー ===== -->
-<div class="sidebar" id="sidebar">
+<div class="sidebar">
     <h2>Rooms</h2>
     <div id="rooms"></div>
 
@@ -154,41 +91,43 @@ button {
 
     <select id="roomType">
         <option value="shared">共有ノート</option>
-        <option value="readonly">閲覧専用</option>
+        <option value="readonly">閲覧専用ノート</option>
     </select>
 
     <button id="joinBtn">入室 / 作成</button>
 
     <hr>
 
-    <button onclick="toggleTheme()">🌗 テーマ切替</button>
-
+    <button id="loginBtn">メールログイン</button>
+    <button id="signupBtn">新規登録</button>
     <button onclick="location.href='/login/github'">
-        GitHubでログイン
-    </button>
+    GitHubでログイン
+</button>
 </div>
 
-<!-- ===== メイン ===== -->
 <div class="main">
-
     <div class="header">
-        <span class="menu-btn" onclick="toggleMenu()">☰</span>
-
         <span id="currentRoom">未接続</span>
-
-        <div style="display:flex; gap:10px;">
-            <button id="inviteBtn">招待</button>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <button id="inviteBtn" style="width:auto;">招待リンク</button>
+            <span id="modeLabel"></span>
         </div>
     </div>
 
     <div id="note" contenteditable="true">
-ノートに入室した時に表示されます
+        ノートに入室した時に表示されます
     </div>
 
     <div class="typing" id="typing"></div>
 </div>
 
 <script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js";
+
+const supabase = createClient(
+  "https://qwoasmceczpcvkuufvkt.supabase.co",
+  "sb_publishable_U3eBuQImXzRhe7irveKkYQ_cw0RVyem"
+);
 
 let ws;
 let isUpdating = false;
@@ -198,23 +137,37 @@ let currentRoomName = "";
 let username = localStorage.getItem("notecord_username");
 
 if (!username) {
-    username = prompt("ユーザー名") || "User";
+    username = prompt("ユーザー名を入力してください") || ("User" + Math.floor(Math.random()*1000));
     localStorage.setItem("notecord_username", username);
 }
 
-/* ===== テーマ ===== */
-function toggleTheme(){
-    document.body.classList.toggle("light");
-    localStorage.setItem("theme", document.body.classList.contains("light"));
+/* ===== Supabase ===== */
+async function loginEmail() {
+    const email = prompt("メールアドレス");
+    const password = prompt("パスワード");
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+    });
+
+    if (error) return alert(error.message);
+
+    localStorage.setItem("sb_token", data.session.access_token);
+    alert("ログイン成功");
 }
 
-if(localStorage.getItem("theme") === "true"){
-    document.body.classList.add("light");
-}
+async function signupEmail() {
+    const email = prompt("メールアドレス");
+    const password = prompt("パスワード");
 
-/* ===== ハンバーガー ===== */
-window.toggleMenu = function(){
-    document.getElementById("sidebar").classList.toggle("open");
+    const { error } = await supabase.auth.signUp({
+        email,
+        password
+    });
+
+    if (error) alert(error.message);
+    else alert("メール確認してください");
 }
 
 /* ===== rooms ===== */
@@ -249,23 +202,23 @@ async function accessRoom() {
     const res = await fetch("/join-room", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ room, password, room_type: type })
+        body: JSON.stringify({ room, password, room_type: type, username })
     });
 
     const result = await res.json();
 
     if (!result.success) return alert(result.message);
 
-    connectRoom(room, result.can_edit);
+    connectRoom(room, result.can_edit, result.label);
     loadRooms();
 }
 
 /* ===== connect ===== */
-function connectRoom(room, canEdit) {
-
+function connectRoom(room, canEdit, label) {
     currentRoomName = room;
 
     document.getElementById("currentRoom").textContent = "# " + room;
+    document.getElementById("modeLabel").textContent = label;
 
     const note = document.getElementById("note");
     note.contentEditable = canEdit;
@@ -296,37 +249,49 @@ function connectRoom(room, canEdit) {
     note.oninput = () => {
         if (!canEdit || isUpdating) return;
 
-        ws.send(JSON.stringify({
-            type: "update",
-            text: note.innerText
-        }));
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "update",
+                text: note.innerText
+            }));
 
-        ws.send(JSON.stringify({
-            type: "typing",
-            user: username
-        }));
+            ws.send(JSON.stringify({
+                type: "typing",
+                user: username
+            }));
+        }
     };
 }
 
-/* ===== 招待 ===== */
+/* ===== invite ===== */
 function copyInviteLink() {
-    if (!currentRoomName) return;
+    if (!currentRoomName) return alert("未接続");
 
     const link = location.origin + "/?room=" + currentRoomName;
 
     navigator.clipboard.writeText(link)
-        .then(() => alert("コピーした"))
+        .then(() => alert("コピー完了"))
+        .catch(() => alert("失敗"));
 }
 
 /* ===== init ===== */
 document.addEventListener("DOMContentLoaded", async () => {
 
-    document.getElementById("joinBtn").onclick = accessRoom;
-    document.getElementById("inviteBtn").onclick = copyInviteLink;
+    document.getElementById("joinBtn").addEventListener("click", accessRoom);
+    document.getElementById("loginBtn").addEventListener("click", loginEmail);
+    document.getElementById("signupBtn").addEventListener("click", signupEmail);
+    document.getElementById("inviteBtn").addEventListener("click", copyInviteLink);
 
     await loadRooms();
-});
 
+    const params = new URLSearchParams(location.search);
+    const room = params.get("room");
+
+    if (room) {
+        document.getElementById("roomInput").value = room;
+        accessRoom();
+    }
+});
 </script>
 
 </body>

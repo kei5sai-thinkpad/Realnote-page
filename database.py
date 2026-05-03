@@ -6,12 +6,10 @@ DB = os.path.join(os.path.dirname(__file__), "app.db")
 def get_conn():
     return sqlite3.connect(DB, check_same_thread=False)
 
-# ================= init =================
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
 
-    # 👤 users
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -20,7 +18,6 @@ def init_db():
     )
     """)
 
-    # 🏠 rooms
     cur.execute("""
     CREATE TABLE IF NOT EXISTS rooms (
         name TEXT PRIMARY KEY,
@@ -29,7 +26,6 @@ def init_db():
     )
     """)
 
-    # 📝 notes
     cur.execute("""
     CREATE TABLE IF NOT EXISTS notes (
         room TEXT PRIMARY KEY,
@@ -40,14 +36,12 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ================= users =================
 def create_user(user_id, name, icon):
     conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("""
-    INSERT OR REPLACE INTO users (id, name, icon)
-    VALUES (?, ?, ?)
+    INSERT OR REPLACE INTO users VALUES (?, ?, ?)
     """, (user_id, name, icon))
 
     conn.commit()
@@ -63,7 +57,6 @@ def get_user(user_id):
     conn.close()
     return user
 
-# ================= rooms =================
 def get_rooms():
     conn = get_conn()
     cur = conn.cursor()
@@ -81,7 +74,6 @@ def get_rooms():
         for r in rows
     ]
 
-# ================= join/create =================
 def join_or_create_room(name, password, room_type):
     conn = get_conn()
     cur = conn.cursor()
@@ -89,13 +81,12 @@ def join_or_create_room(name, password, room_type):
     cur.execute("SELECT password, type FROM rooms WHERE name=?", (name,))
     room = cur.fetchone()
 
-    # 既存
     if room:
         saved_password, saved_type = room
 
         if saved_password and saved_password != password:
             conn.close()
-            return {"success": False, "message": "パスワード違う"}
+            return {"success": False}
 
         conn.close()
         return {
@@ -104,16 +95,8 @@ def join_or_create_room(name, password, room_type):
             "label": "閲覧専用" if saved_type == "readonly" else "共有"
         }
 
-    # 新規
-    cur.execute(
-        "INSERT INTO rooms VALUES (?, ?, ?)",
-        (name, password, room_type)
-    )
-
-    cur.execute(
-        "INSERT INTO notes VALUES (?, ?)",
-        (name, "")
-    )
+    cur.execute("INSERT INTO rooms VALUES (?, ?, ?)", (name, password, room_type))
+    cur.execute("INSERT INTO notes VALUES (?, ?)", (name, ""))
 
     conn.commit()
     conn.close()
@@ -124,7 +107,6 @@ def join_or_create_room(name, password, room_type):
         "label": "閲覧専用" if room_type == "readonly" else "共有"
     }
 
-# ================= notes =================
 def get_note(room):
     conn = get_conn()
     cur = conn.cursor()
@@ -140,8 +122,7 @@ def save_note(room, text):
     cur = conn.cursor()
 
     cur.execute("""
-    INSERT OR REPLACE INTO notes (room, content)
-    VALUES (?, ?)
+    INSERT OR REPLACE INTO notes VALUES (?, ?)
     """, (room, text))
 
     conn.commit()

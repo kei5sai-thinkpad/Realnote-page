@@ -2,9 +2,9 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from authlib.integrations.starlette_client import OAuth
-import os
 import asyncio
-import random
+from datetime import datetime
+import os
 
 from database import *
 
@@ -23,7 +23,6 @@ clients = {}
 
 # ================= OAuth =================
 oauth = OAuth()
-
 oauth.register(
     name="github",
     client_id=os.getenv("GITHUB_CLIENT_ID"),
@@ -34,11 +33,12 @@ oauth.register(
     client_kwargs={"scope": "user:email"},
 )
 
-# ================= GitHub login =================
 @app.get("/login/github")
 async def login_github(request: Request):
-    redirect_uri = request.url_for("auth_callback")
-    return await oauth.github.authorize_redirect(request, redirect_uri)
+    return await oauth.github.authorize_redirect(
+        request,
+        request.url_for("auth_callback")
+    )
 
 @app.get("/auth/callback")
 async def auth_callback(request: Request):
@@ -46,31 +46,29 @@ async def auth_callback(request: Request):
     resp = await oauth.github.get("user", token=token)
     user = resp.json()
 
-    user_id = str(user["id"])
-    username = user["login"]
-    icon = user["avatar_url"]
+    create_user(str(user["id"]), user["login"], user["avatar_url"])
 
-    create_user(user_id, username, icon)
-
-    request.session["user"] = user_id
-    request.session["username"] = username
-
+    request.session["user"] = str(user["id"])
     return RedirectResponse("/app")
 
-# ================= home =================
+# ================= pages =================
 @app.get("/")
 async def home(request: Request):
+    if not request.session.get("user"):
+        return HTMLResponse('<a href="/login/github">GitHubログイン</a>')
     return RedirectResponse("/app")
 
-# ================= app =================
 @app.get("/app")
 async def app_page(request: Request):
     user_id = request.session.get("user")
-
     if not user_id:
-        return HTMLResponse('<a href="/login/github">GitHubログイン</a>')
+        return RedirectResponse("/")
 
     user = get_user(user_id)
+
+    if not user:
+        request.session.clear()
+        return RedirectResponse("/")
 
     html = open("index.html", encoding="utf-8").read()
 
@@ -88,15 +86,11 @@ def rooms():
 
 @app.post("/join-room")
 async def join_room(data: dict):
-    name = data.get("room")
-    password = data.get("password", "")
-    room_type = data.get("room_type")
-
-    # 🔥 newsは強制閲覧専用
-    if name == "news":
-        room_type = "readonly"
-
-    return join_or_create_room(name, password, room_type)
+    return join_or_create_room(
+        data.get("room"),
+        data.get("password", ""),
+        data.get("room_type")
+    )
 
 # ================= websocket =================
 @app.websocket("/ws/{room}")
@@ -121,49 +115,38 @@ async def ws(ws: WebSocket, room: str):
                     if c != ws:
                         await c.send_json(data)
 
-            elif data["type"] == "typing":
-                for c in clients[room]:
-                    if c != ws:
-                        await c.send_json(data)
-
     except WebSocketDisconnect:
         clients[room].remove(ws)
-        if not clients[room]:
-            del clients[room]
 
-# ================= BOT =================
-
-def get_fake_news():
-    news = [
-        "AIが進化中",
-        "新ゲーム登場",
-        "今日は晴れ",
-        "Python人気爆上がり",
-        "新スマホ発表"
-    ]
-    return random.choice(news)
-
+# ================= Bot =================
 async def news_bot():
     while True:
         try:
-            room = "news"
-            text = "📰 最新ニュース\n\n" + get_fake_news()
+            room = "news-room"
+
+            text = f"""📰 最新ニュース
+
+更新: {datetime.now().strftime('%H:%M:%S')}
+
+・AIが進化中
+・新アプリ登場
+・開発者爆増中
+"""
 
             save_note(room, text)
 
             if room in clients:
-                for ws in clients[room]:
-                    await ws.send_json({
+                for c in clients[room]:
+                    await c.send_json({
                         "type": "update",
                         "text": text
                     })
 
         except Exception as e:
-            print("BOT ERROR:", e)
+            print("Bot error:", e)
 
-        await asyncio.sleep(60)
+        await asyncio.sleep(20)
 
-# 起動時にBot開始
 @app.on_event("startup")
 async def startup():
     asyncio.create_task(news_bot())

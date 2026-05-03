@@ -2,123 +2,545 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NoteCord</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500&display=swap" rel="stylesheet">
 
 <style>
-body {
-    margin: 0;
-    font-family: sans-serif;
-    background: #0f172a;
-    color: white;
-    display: flex;
-    height: 100vh;
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-.sidebar {
-    width: 280px;
-    background: #020617;
-    padding: 15px;
-    border-right: 1px solid #1e293b;
+:root {
+  --bg-base:       #0a0c10;
+  --bg-surface:    #111318;
+  --bg-elevated:   #181c23;
+  --bg-hover:      #1e222b;
+  --border:        rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.13);
+  --text-primary:  #e8eaf0;
+  --text-secondary:#8b90a0;
+  --text-muted:    #4a5060;
+  --accent:        #4f8ef7;
+  --accent-dim:    rgba(79,142,247,0.12);
+  --accent-border: rgba(79,142,247,0.35);
+  --success:       #3ecf8e;
+  --success-dim:   rgba(62,207,142,0.12);
+  --warning-dim:   rgba(245,158,11,0.12);
+  --warning:       #f59e0b;
+  --radius-sm:     6px;
+  --radius-md:     10px;
+  --radius-lg:     14px;
 }
+
+html, body {
+  height: 100%;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Geist', 'SF Pro Display', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== LAYOUT ===== */
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+  width: 252px;
+  flex-shrink: 0;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 18px 16px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-icon svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--accent);
+}
+
+.brand-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+/* Room list */
+.room-section {
+  padding: 12px 10px 6px;
+}
+
+.section-label {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 6px;
+  margin-bottom: 6px;
+}
+
+#rooms {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 10px 8px;
+}
+
+#rooms::-webkit-scrollbar { width: 3px; }
+#rooms::-webkit-scrollbar-track { background: transparent; }
+#rooms::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
 
 .room {
-    padding: 10px;
-    border-radius: 10px;
-    cursor: pointer;
-    margin-bottom: 6px;
-    background: #111827;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  margin-bottom: 2px;
+  transition: background 0.13s;
+  user-select: none;
 }
 
 .room:hover {
-    background: #1e293b;
+  background: var(--bg-hover);
 }
 
+.room.active {
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
+}
+
+.room-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-muted);
+}
+
+.room-dot.green  { background: var(--success); box-shadow: 0 0 6px rgba(62,207,142,.4); }
+.room-dot.blue   { background: var(--accent);  box-shadow: 0 0 6px rgba(79,142,247,.4); }
+.room-dot.amber  { background: var(--warning); box-shadow: 0 0 6px rgba(245,158,11,.4); }
+
+.room-name {
+  flex: 1;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room.active .room-name {
+  color: var(--text-primary);
+}
+
+.room-pill {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 99px;
+  flex-shrink: 0;
+}
+
+.room-pill.shared {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+}
+
+.room-pill.readonly {
+  background: var(--warning-dim);
+  color: var(--warning);
+}
+
+/* Sidebar form */
+.sidebar-form {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field-group {
+  display: flex;
+  gap: 6px;
+}
+
+.nc-input {
+  flex: 1;
+  height: 34px;
+  padding: 0 11px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.nc-input::placeholder { color: var(--text-muted); }
+.nc-input:focus { border-color: var(--accent-border); }
+
+.nc-select {
+  flex: 1;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  font-family: inherit;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234a5060' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+.nc-btn {
+  height: 34px;
+  padding: 0 13px;
+  font-size: 12.5px;
+  font-family: inherit;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.13s, transform 0.1s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.nc-btn:active { transform: scale(0.97); }
+
+.nc-btn.primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.nc-btn.primary:hover { opacity: 0.9; }
+
+.nc-btn.ghost {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+}
+
+.nc-btn.ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.nc-btn.full { width: 100%; }
+
+/* Auth section */
+.sidebar-auth {
+  padding: 10px 12px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.auth-row {
+  display: flex;
+  gap: 6px;
+}
+
+/* ===== MAIN CONTENT ===== */
 .main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg-base);
 }
 
-.header {
-    padding: 15px 20px;
-    background: #020617;
-    border-bottom: 1px solid #1e293b;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+/* Topbar */
+.topbar {
+  height: 52px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  background: var(--bg-surface);
 }
 
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-hash {
+  font-size: 20px;
+  font-weight: 300;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+#currentRoom {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+#modeLabel {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--success-dim);
+  color: var(--success);
+  border: 1px solid rgba(62,207,142,0.25);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* Editor */
 #note {
-    flex: 1;
-    padding: 20px;
-    outline: none;
-    overflow: auto;
-    white-space: pre-wrap;
-    font-size: 16px;
-    line-height: 1.6;
+  flex: 1;
+  padding: 32px 40px;
+  outline: none;
+  overflow-y: auto;
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  caret-color: var(--accent);
 }
 
-.typing {
-    padding: 10px 20px;
-    color: #94a3b8;
-    min-height: 24px;
+#note::-webkit-scrollbar { width: 4px; }
+#note::-webkit-scrollbar-track { background: transparent; }
+#note::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
+
+#note:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
 }
 
-input, button, select {
-    width: 100%;
-    padding: 10px;
-    margin-top: 10px;
-    border-radius: 10px;
-    border: none;
-    box-sizing: border-box;
+/* Status bar */
+.statusbar {
+  height: 30px;
+  padding: 0 22px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  background: var(--bg-surface);
 }
 
-button {
-    background: #3b82f6;
-    color: white;
-    cursor: pointer;
+#typing {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 18px;
 }
+
+.typing-dots {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.typing-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: typingBounce 1s infinite;
+}
+
+.typing-dots span:nth-child(2) { animation-delay: .15s; }
+.typing-dots span:nth-child(3) { animation-delay: .3s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: .5; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.status-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* ===== CONNECT SCREEN ===== */
+.connect-screen {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--text-muted);
+}
+
+.connect-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.connect-icon svg { stroke: var(--text-muted); }
+.connect-screen p { font-size: 14px; }
+.connect-screen small { font-size: 12px; color: var(--text-muted); }
 </style>
 </head>
 
 <body>
+<div class="app">
 
-<div class="sidebar">
-    <h2>Rooms</h2>
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+      </div>
+      <span class="brand-name">NoteCord</span>
+    </div>
+
+    <div class="room-section">
+      <div class="section-label">ルーム</div>
+    </div>
+
     <div id="rooms"></div>
 
-    <input id="roomInput" placeholder="部屋名">
+    <div class="sidebar-form">
+      <input class="nc-input" id="roomInput" placeholder="部屋名を入力...">
+      <div class="field-group">
+        <select class="nc-select" id="roomType">
+          <option value="shared">共有ノート</option>
+          <option value="readonly">閲覧専用</option>
+        </select>
+        <button class="nc-btn primary" id="joinBtn">入室</button>
+      </div>
+    </div>
 
-    <select id="roomType">
-        <option value="shared">共有ノート</option>
-        <option value="readonly">閲覧専用ノート</option>
-    </select>
+    <div class="sidebar-auth">
+      <div class="auth-row">
+        <button class="nc-btn ghost full" id="loginBtn">ログイン</button>
+        <button class="nc-btn ghost full" id="signupBtn">新規登録</button>
+      </div>
+      <button class="nc-btn ghost full" onclick="location.href='/login/github'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+        </svg>
+        GitHub でログイン
+      </button>
+    </div>
+  </div>
 
-    <button id="joinBtn">入室 / 作成</button>
-
-    <hr>
-
-    <button id="loginBtn">メールログイン</button>
-    <button id="signupBtn">新規登録</button>
-    <button onclick="location.href='/login/github'">
-    GitHubでログイン
-</button>
-</div>
-
-<div class="main">
-    <div class="header">
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <span class="topbar-hash">#</span>
         <span id="currentRoom">未接続</span>
-        <div style="display:flex; gap:10px; align-items:center;">
-            <button id="inviteBtn" style="width:auto;">招待リンク</button>
-            <span id="modeLabel"></span>
-        </div>
+        <span id="modeLabel" style="display:none"></span>
+      </div>
+      <div class="topbar-right">
+        <button class="nc-btn ghost" id="inviteBtn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          招待リンク
+        </button>
+        <div class="avatar" id="userAvatar">?</div>
+      </div>
     </div>
 
-    <div id="note" contenteditable="true">
-        ノートに入室した時に表示されます
+    <div id="note"
+      contenteditable="false"
+      data-placeholder="ルームに参加するとここにノートが表示されます...">
     </div>
 
-    <div class="typing" id="typing"></div>
+    <div class="statusbar">
+      <div id="typing"></div>
+      <div class="status-meta" id="statusMeta"></div>
+    </div>
+  </div>
+
 </div>
 
 <script type="module">
@@ -135,164 +557,160 @@ let currentRoomName = "";
 
 /* ===== ユーザー ===== */
 let username = localStorage.getItem("notecord_username");
-
 if (!username) {
-    username = prompt("ユーザー名を入力してください") || ("User" + Math.floor(Math.random()*1000));
-    localStorage.setItem("notecord_username", username);
+  username = prompt("ユーザー名を入力してください") || ("User" + Math.floor(Math.random() * 1000));
+  localStorage.setItem("notecord_username", username);
 }
 
-/* ===== Supabase ===== */
+const avatarEl = document.getElementById("userAvatar");
+avatarEl.textContent = username.slice(0, 2);
+
+/* ===== Auth ===== */
 async function loginEmail() {
-    const email = prompt("メールアドレス");
-    const password = prompt("パスワード");
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-    });
-
-    if (error) return alert(error.message);
-
-    localStorage.setItem("sb_token", data.session.access_token);
-    alert("ログイン成功");
+  const email = prompt("メールアドレス");
+  const password = prompt("パスワード");
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return alert(error.message);
+  localStorage.setItem("sb_token", data.session.access_token);
+  alert("ログイン成功");
 }
 
 async function signupEmail() {
-    const email = prompt("メールアドレス");
-    const password = prompt("パスワード");
-
-    const { error } = await supabase.auth.signUp({
-        email,
-        password
-    });
-
-    if (error) alert(error.message);
-    else alert("メール確認してください");
+  const email = prompt("メールアドレス");
+  const password = prompt("パスワード");
+  const { error } = await supabase.auth.signUp({ email, password });
+  if (error) alert(error.message);
+  else alert("メール確認をしてください");
 }
 
-/* ===== rooms ===== */
+/* ===== Rooms ===== */
 async function loadRooms() {
-    const res = await fetch("/rooms");
-    const rooms = await res.json();
+  const res = await fetch("/rooms");
+  const rooms = await res.json();
 
-    const container = document.getElementById("rooms");
-    container.innerHTML = "";
+  const container = document.getElementById("rooms");
+  container.innerHTML = "";
 
-    rooms.forEach(room => {
-        const div = document.createElement("div");
-        div.className = "room";
-        div.textContent = room.name + " (" + room.label + ")";
-        div.onclick = () => {
-            document.getElementById("roomInput").value = room.name;
-            accessRoom();
-        };
-        container.appendChild(div);
-    });
+  rooms.forEach(room => {
+    const div = document.createElement("div");
+    div.className = "room" + (room.name === currentRoomName ? " active" : "");
+
+    const colors = ["green", "blue", "amber"];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+
+    const isShared = room.label === "共有";
+
+    div.innerHTML = `
+      <div class="room-dot ${color}"></div>
+      <span class="room-name">${room.name}</span>
+      <span class="room-pill ${isShared ? "shared" : "readonly"}">${room.label}</span>
+    `;
+
+    div.onclick = () => {
+      document.getElementById("roomInput").value = room.name;
+      accessRoom();
+    };
+    container.appendChild(div);
+  });
 }
 
-/* ===== join ===== */
+/* ===== Join ===== */
 async function accessRoom() {
-    const room = document.getElementById("roomInput").value.trim();
-    const type = document.getElementById("roomType").value;
+  const room = document.getElementById("roomInput").value.trim();
+  const type = document.getElementById("roomType").value;
+  if (!room) return alert("部屋名を入力してください");
 
-    if (!room) return alert("部屋名を入力");
+  const password = prompt("パスワード（不要な場合は空欄）") || "";
 
-    const password = prompt("パスワード") || "";
+  const res = await fetch("/join-room", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ room, password, room_type: type, username })
+  });
 
-    const res = await fetch("/join-room", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ room, password, room_type: type, username })
-    });
+  const result = await res.json();
+  if (!result.success) return alert(result.message);
 
-    const result = await res.json();
-
-    if (!result.success) return alert(result.message);
-
-    connectRoom(room, result.can_edit, result.label);
-    loadRooms();
+  connectRoom(room, result.can_edit, result.label);
+  loadRooms();
 }
 
-/* ===== connect ===== */
+/* ===== Connect ===== */
 function connectRoom(room, canEdit, label) {
-    currentRoomName = room;
+  currentRoomName = room;
 
-    document.getElementById("currentRoom").textContent = "# " + room;
-    document.getElementById("modeLabel").textContent = label;
+  document.getElementById("currentRoom").textContent = room;
 
-    const note = document.getElementById("note");
-    note.contentEditable = canEdit;
+  const modeEl = document.getElementById("modeLabel");
+  modeEl.textContent = label;
+  modeEl.style.display = "inline";
 
-    if (ws) ws.close();
+  const note = document.getElementById("note");
+  note.contentEditable = canEdit ? "true" : "false";
 
-    ws = new WebSocket(
-        (location.protocol === "https:" ? "wss://" : "ws://")
-        + location.host + "/ws/" + room
-    );
+  if (ws) ws.close();
 
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+  ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://")
+    + location.host + "/ws/" + room
+  );
 
-        if (data.type === "init" || data.type === "update") {
-            isUpdating = true;
-            note.innerText = data.text;
-            isUpdating = false;
-        }
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
 
-        if (data.type === "typing") {
-            const typing = document.getElementById("typing");
-            typing.textContent = data.user + " が入力中...";
-            setTimeout(() => typing.textContent = "", 1000);
-        }
-    };
-
-    note.oninput = () => {
-        if (!canEdit || isUpdating) return;
-
-        if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                type: "update",
-                text: note.innerText
-            }));
-
-            ws.send(JSON.stringify({
-                type: "typing",
-                user: username
-            }));
-        }
-    };
-}
-
-/* ===== invite ===== */
-function copyInviteLink() {
-    if (!currentRoomName) return alert("未接続");
-
-    const link = location.origin + "/?room=" + currentRoomName;
-
-    navigator.clipboard.writeText(link)
-        .then(() => alert("コピー完了"))
-        .catch(() => alert("失敗"));
-}
-
-/* ===== init ===== */
-document.addEventListener("DOMContentLoaded", async () => {
-
-    document.getElementById("joinBtn").addEventListener("click", accessRoom);
-    document.getElementById("loginBtn").addEventListener("click", loginEmail);
-    document.getElementById("signupBtn").addEventListener("click", signupEmail);
-    document.getElementById("inviteBtn").addEventListener("click", copyInviteLink);
-
-    await loadRooms();
-
-    const params = new URLSearchParams(location.search);
-    const room = params.get("room");
-
-    if (room) {
-        document.getElementById("roomInput").value = room;
-        accessRoom();
+    if (data.type === "init" || data.type === "update") {
+      isUpdating = true;
+      note.innerText = data.text;
+      isUpdating = false;
     }
+
+    if (data.type === "typing") {
+      const typingEl = document.getElementById("typing");
+      typingEl.innerHTML = `
+        <div class="typing-dots">
+          <span></span><span></span><span></span>
+        </div>
+        ${data.user} が入力中
+      `;
+      clearTimeout(typingEl._timer);
+      typingEl._timer = setTimeout(() => { typingEl.innerHTML = ""; }, 1500);
+    }
+  };
+
+  note.oninput = () => {
+    if (!canEdit || isUpdating) return;
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "update", text: note.innerText }));
+      ws.send(JSON.stringify({ type: "typing", user: username }));
+    }
+  };
+}
+
+/* ===== Invite ===== */
+function copyInviteLink() {
+  if (!currentRoomName) return alert("ルームに接続していません");
+  const link = location.origin + "/?room=" + currentRoomName;
+  navigator.clipboard.writeText(link)
+    .then(() => alert("招待リンクをコピーしました"))
+    .catch(() => alert("コピーに失敗しました"));
+}
+
+/* ===== Init ===== */
+document.addEventListener("DOMContentLoaded", async () => {
+  document.getElementById("joinBtn").addEventListener("click", accessRoom);
+  document.getElementById("loginBtn").addEventListener("click", loginEmail);
+  document.getElementById("signupBtn").addEventListener("click", signupEmail);
+  document.getElementById("inviteBtn").addEventListener("click", copyInviteLink);
+
+  await loadRooms();
+
+  const params = new URLSearchParams(location.search);
+  const room = params.get("room");
+  if (room) {
+    document.getElementById("roomInput").value = room;
+    accessRoom();
+  }
 });
 </script>
-
 </body>
 </html>

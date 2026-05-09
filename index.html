@@ -6,17 +6,10 @@
 <title>NoteCord</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=Lora:wght@400;500&display=swap" rel="stylesheet">
-
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* =====================
-   THEME TOKENS
-   ===================== */
 :root {
-  --transition-theme: background 0.35s ease, color 0.35s ease, border-color 0.35s ease;
-
-  /* shared */
   --accent:        #5b8dee;
   --accent-soft:   rgba(91,141,238,0.13);
   --accent-border: rgba(91,141,238,0.32);
@@ -24,525 +17,552 @@
   --success-soft:  rgba(52,211,153,0.13);
   --warn:          #fbbf24;
   --warn-soft:     rgba(251,191,36,0.12);
-  --radius-xs:     4px;
-  --radius-sm:     7px;
-  --radius-md:     11px;
-  --radius-lg:     16px;
-  --radius-xl:     22px;
+  --radius-xs: 4px; --radius-sm: 7px; --radius-md: 11px;
+  --radius-lg: 16px; --radius-xl: 22px;
+  --trans: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 [data-theme="dark"] {
-  --bg-void:       #080b10;
-  --bg-base:       #0d1117;
-  --bg-surface:    #131920;
-  --bg-raised:     #1a2030;
-  --bg-hover:      #1f2840;
-  --bg-input:      #161d28;
-  --border-faint:  rgba(255,255,255,0.055);
-  --border-subtle: rgba(255,255,255,0.10);
-  --border-strong: rgba(255,255,255,0.17);
-  --text-primary:  #e6eaf4;
-  --text-secondary:#7e8fa8;
-  --text-muted:    #3d4a5c;
-  --text-accent:   #7ba8f5;
-  --shadow-sm:     0 2px 8px rgba(0,0,0,0.4);
-  --shadow-md:     0 8px 32px rgba(0,0,0,0.55);
+  --bg-void:    #07090e;
+  --bg-base:    #0d1117;
+  --bg-surface: #111820;
+  --bg-raised:  #171f2c;
+  --bg-hover:   #1c2535;
+  --bg-input:   #141b26;
+  --bg-server:  #08090f;
+  --bf:  rgba(255,255,255,0.055);
+  --bs:  rgba(255,255,255,0.10);
+  --bst: rgba(255,255,255,0.17);
+  --tp:  #e4e8f2; --ts: #7a8ba4; --tm: #374556; --ta: #7ba8f5;
+  --shadow: 0 8px 32px rgba(0,0,0,0.6);
 }
 
 [data-theme="light"] {
-  --bg-void:       #e8ecf0;
-  --bg-base:       #f0f3f7;
-  --bg-surface:    #ffffff;
-  --bg-raised:     #f7f9fc;
-  --bg-hover:      #edf1f7;
-  --bg-input:      #f3f6fa;
-  --border-faint:  rgba(0,0,0,0.055);
-  --border-subtle: rgba(0,0,0,0.09);
-  --border-strong: rgba(0,0,0,0.15);
-  --text-primary:  #1a2035;
-  --text-secondary:#556070;
-  --text-muted:    #aab4c0;
-  --text-accent:   #3a6fd8;
-  --shadow-sm:     0 2px 8px rgba(0,0,0,0.08);
-  --shadow-md:     0 8px 32px rgba(0,0,0,0.12);
+  --bg-void:    #dde2e8;
+  --bg-base:    #eef1f6;
+  --bg-surface: #ffffff;
+  --bg-raised:  #f5f7fb;
+  --bg-hover:   #ebeff6;
+  --bg-input:   #f0f3f9;
+  --bg-server:  #d5dae0;
+  --bf:  rgba(0,0,0,0.055);
+  --bs:  rgba(0,0,0,0.09);
+  --bst: rgba(0,0,0,0.15);
+  --tp:  #18202e; --ts: #52606f; --tm: #a8b4c0; --ta: #3464cc;
+  --shadow: 0 8px 32px rgba(0,0,0,0.12);
 }
 
-/* =====================
-   GLOBAL
-   ===================== */
-html, body {
-  height: 100%;
-  background: var(--bg-void);
-  color: var(--text-primary);
-  font-family: 'DM Sans', system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  transition: var(--transition-theme);
+html, body { height: 100%; font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+  background: var(--bg-void); color: var(--tp); transition: var(--trans); }
+
+/* ===================== LAYOUT ===================== */
+.app { display: flex; height: 100vh; overflow: hidden; }
+
+/* ===================== SERVER RAIL ===================== */
+.server-rail {
+  width: 60px; flex-shrink: 0;
+  background: var(--bg-server);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 10px 0; gap: 6px; overflow-y: auto; overflow-x: hidden;
+  border-right: 1px solid var(--bf);
+  transition: var(--trans);
 }
+.server-rail::-webkit-scrollbar { display: none; }
 
-/* =====================
-   LAYOUT
-   ===================== */
-.app {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-  background: var(--bg-base);
-  transition: var(--transition-theme);
-}
-
-/* =====================
-   OVERLAY (mobile)
-   ===================== */
-.sidebar-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.55);
-  z-index: 40;
-  opacity: 0; pointer-events: none;
-  transition: opacity 0.25s;
-  backdrop-filter: blur(2px);
-}
-.sidebar-overlay.open { opacity: 1; pointer-events: auto; }
-
-/* =====================
-   SIDEBAR
-   ===================== */
-.sidebar {
-  width: 256px; flex-shrink: 0;
-  background: var(--bg-surface);
-  border-right: 1px solid var(--border-faint);
-  display: flex; flex-direction: column;
-  overflow: hidden;
-  transition: var(--transition-theme);
-}
-
-/* Brand */
-.sidebar-brand {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 16px 15px;
-  border-bottom: 1px solid var(--border-faint);
-}
-
-.brand-left { display: flex; align-items: center; gap: 10px; }
-
-.brand-mark {
-  width: 30px; height: 30px;
-  border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-border);
+.server-icon {
+  width: 42px; height: 42px; border-radius: var(--radius-lg);
   display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0; font-size: 13px; font-weight: 600;
+  color: var(--ts); background: var(--bg-raised);
+  border: 2px solid transparent;
+  transition: border-radius 0.2s, border-color 0.2s, background 0.15s,
+              color 0.15s, transform 0.15s;
+  user-select: none; position: relative; letter-spacing: -0.02em;
+}
+.server-icon:hover { border-radius: var(--radius-md); background: var(--accent-soft); color: var(--accent); transform: scale(1.05); }
+.server-icon.active { border-radius: var(--radius-md); border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+.server-divider { width: 30px; height: 1px; background: var(--bs); flex-shrink: 0; margin: 2px 0; }
+
+.server-add {
+  width: 42px; height: 42px; border-radius: 99px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+  background: var(--bg-raised); color: var(--success);
+  border: 2px dashed rgba(52,211,153,0.3);
+  transition: border-radius 0.2s, background 0.15s, transform 0.15s;
+  font-size: 20px; font-weight: 300; line-height: 1;
+}
+.server-add:hover { border-radius: var(--radius-md); background: var(--success-soft); transform: scale(1.05); }
+
+/* Image icon */
+.server-icon img { width:100%; height:100%; border-radius:inherit; object-fit:cover; display:block; }
+
+/* Upload drop area in modal */
+.icon-upload-area {
+  width:100%; aspect-ratio:1; max-width:120px; margin:0 auto 4px;
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--bs);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  cursor:pointer; gap:6px; color:var(--tm); font-size:12px;
+  background:var(--bg-input); position:relative;
+  transition: border-color 0.15s, background 0.15s;
+  overflow:hidden;
+}
+.icon-upload-area:hover { border-color:var(--accent-border); background:var(--accent-soft); }
+.icon-upload-area svg { width:26px; height:26px; stroke:currentColor; fill:none; }
+.icon-upload-area img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:inherit; }
+.icon-upload-area input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+.icon-upload-hint { font-size:11px; color:var(--tm); text-align:center; margin-bottom:4px; }
+
+/* Active indicator pip */
+.server-icon.active::before, .server-icon:hover::before {
+  content: '';
+  position: absolute; left: -8px; top: 50%; transform: translateY(-50%);
+  width: 4px; height: 60%; border-radius: 0 3px 3px 0;
+  background: var(--accent); transition: height 0.15s;
+}
+.server-icon:hover::before { height: 30%; }
+.server-icon.active::before { height: 60%; }
+
+/* ===================== CHANNEL SIDEBAR ===================== */
+.ch-sidebar {
+  width: 230px; flex-shrink: 0;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--bf);
+  display: flex; flex-direction: column;
+  overflow: hidden; transition: var(--trans);
+}
+
+/* Server header in channel sidebar */
+.ch-header {
+  height: 52px; padding: 0 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--bf); flex-shrink: 0;
+  cursor: pointer; transition: background 0.15s;
+}
+.ch-header:hover { background: var(--bg-hover); }
+.ch-server-name {
+  font-size: 14px; font-weight: 500; color: var(--tp);
+  font-family: 'Lora', serif; letter-spacing: -0.02em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+}
+.ch-header-arrow {
+  width: 18px; height: 18px; stroke: var(--ts); flex-shrink: 0;
   transition: transform 0.2s;
 }
-.brand-mark:hover { transform: rotate(-4deg) scale(1.05); }
-.brand-mark svg { width: 15px; height: 15px; stroke: var(--accent); }
 
-.brand-title {
-  font-size: 15px; font-weight: 500;
-  color: var(--text-primary); letter-spacing: -0.02em;
-  font-family: 'Lora', serif;
-  transition: var(--transition-theme);
+/* Channel list */
+.ch-list { flex: 1; overflow-y: auto; padding: 6px 6px 80px; }
+.ch-list::-webkit-scrollbar { width: 3px; }
+.ch-list::-webkit-scrollbar-thumb { background: var(--bs); border-radius: 99px; }
+
+/* Folder (category) */
+.folder {
+  margin-bottom: 2px;
 }
-
-/* Theme toggle */
-.theme-toggle {
-  width: 32px; height: 32px;
+.folder-header {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 6px 4px; cursor: pointer; user-select: none;
   border-radius: var(--radius-sm);
-  background: transparent;
-  border: 1px solid var(--border-subtle);
+  transition: background 0.13s;
+}
+.folder-header:hover { background: var(--bg-hover); }
+.folder-chevron {
+  width: 12px; height: 12px; stroke: var(--tm); fill: none;
+  flex-shrink: 0; transition: transform 0.2s;
+}
+.folder.collapsed .folder-chevron { transform: rotate(-90deg); }
+.folder-name {
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: .07em; text-transform: uppercase;
+  color: var(--tm); flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.folder-add {
+  width: 16px; height: 16px; stroke: var(--tm); fill: none;
+  flex-shrink: 0; opacity: 0; transition: opacity 0.13s;
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--text-secondary);
-  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.2s;
 }
-.theme-toggle:hover { background: var(--bg-hover); color: var(--text-primary); transform: scale(1.07); }
-.theme-toggle svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
+.folder-header:hover .folder-add { opacity: 1; }
 
-/* Section label */
-.section-label {
-  font-size: 10px; font-weight: 500;
-  letter-spacing: .1em; text-transform: uppercase;
-  color: var(--text-muted);
-  padding: 13px 16px 6px;
-  transition: var(--transition-theme);
+.folder-rooms {
+  overflow: hidden;
+  transition: max-height 0.25s cubic-bezier(0.4,0,0.2,1);
+  max-height: 1000px;
 }
+.folder.collapsed .folder-rooms { max-height: 0; }
 
-/* Room list */
-#rooms {
-  flex: 1; overflow-y: auto; padding: 4px 8px 8px;
-}
-#rooms::-webkit-scrollbar { width: 3px; }
-#rooms::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 99px; }
-
-.room {
-  display: flex; align-items: center; gap: 9px;
-  padding: 8px 10px; border-radius: var(--radius-md);
-  cursor: pointer; margin-bottom: 2px; border: 1px solid transparent;
-  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+/* Room item */
+.room-item {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 8px 5px 18px;
+  border-radius: var(--radius-sm); cursor: pointer;
+  margin-bottom: 1px; border: 1px solid transparent;
+  transition: background 0.13s, border-color 0.13s, transform 0.1s;
   user-select: none;
 }
-.room:hover { background: var(--bg-hover); transform: translateX(2px); }
-.room:active { transform: translateX(2px) scale(0.98); }
-.room.active {
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
-  transform: translateX(2px);
-}
+.room-item:hover { background: var(--bg-hover); transform: translateX(2px); }
+.room-item.active { background: var(--accent-soft); border-color: var(--accent-border); }
 
-.room-dot {
-  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
-  background: var(--text-muted);
-  transition: transform 0.2s;
-}
-.room:hover .room-dot { transform: scale(1.3); }
-.room-dot.green { background: var(--success); box-shadow: 0 0 5px rgba(52,211,153,.5); }
-.room-dot.blue  { background: var(--accent);  box-shadow: 0 0 5px rgba(91,141,238,.5); }
-.room-dot.amber { background: var(--warn);    box-shadow: 0 0 5px rgba(251,191,36,.5); }
-
-.room-name {
-  flex: 1; font-size: 13px; color: var(--text-secondary);
+.room-hash { font-size: 15px; color: var(--tm); line-height: 1; flex-shrink: 0; font-weight: 300; }
+.room-item.active .room-hash { color: var(--accent); }
+.room-item-name {
+  flex: 1; font-size: 13px; color: var(--ts);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  transition: color 0.15s;
+  transition: color 0.13s;
 }
-.room.active .room-name, .room:hover .room-name { color: var(--text-primary); }
+.room-item:hover .room-item-name, .room-item.active .room-item-name { color: var(--tp); }
 
-.room-pill {
-  font-size: 10px; font-weight: 500;
-  padding: 2px 7px; border-radius: 99px; flex-shrink: 0;
-  transition: var(--transition-theme);
+.room-item-badge {
+  font-size: 10px; padding: 1px 5px; border-radius: 99px; flex-shrink: 0;
 }
-.room-pill.shared  { background: var(--accent-soft); color: var(--text-accent); border: 1px solid var(--accent-border); }
-.room-pill.readonly{ background: var(--warn-soft); color: var(--warn); }
+.room-item-badge.shared  { background: var(--accent-soft); color: var(--ta); border: 1px solid var(--accent-border); }
+.room-item-badge.readonly{ background: var(--warn-soft); color: var(--warn); }
 
-/* Sidebar form */
-.sidebar-form {
-  padding: 12px; border-top: 1px solid var(--border-faint);
-  display: flex; flex-direction: column; gap: 7px;
-  transition: var(--transition-theme);
-}
-.field-row { display: flex; gap: 6px; }
+/* No-folder rooms (直下) */
+.root-rooms { margin-bottom: 4px; }
 
-.nc-input {
-  flex: 1; height: 34px; padding: 0 11px;
-  font-size: 13px; font-family: inherit;
-  background: var(--bg-input);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary); outline: none;
-  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+/* ===================== BOTTOM USER BAR ===================== */
+.user-bar {
+  position: absolute; bottom: 0; left: 60px;
+  width: 230px; height: 52px; padding: 0 10px;
+  background: var(--bg-server); border-top: 1px solid var(--bf);
+  display: flex; align-items: center; gap: 8px;
+  transition: var(--trans);
 }
-.nc-input::placeholder { color: var(--text-muted); }
-.nc-input:focus {
-  border-color: var(--accent-border);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-  background: var(--bg-surface);
+.user-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--accent-soft); border: 1.5px solid var(--accent-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; color: var(--ta); flex-shrink: 0;
 }
+.user-name { flex: 1; font-size: 12.5px; font-weight: 500; color: var(--tp); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-status { font-size: 11px; color: var(--tm); }
 
-.nc-select {
-  flex: 1; height: 34px; padding: 0 28px 0 10px;
-  font-size: 12.5px; font-family: inherit;
-  background: var(--bg-input);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary); outline: none; cursor: pointer; appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236b7a8d' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 9px center;
-  transition: border-color 0.2s;
+.user-actions { display: flex; gap: 4px; }
+.icon-btn {
+  width: 28px; height: 28px; border-radius: var(--radius-xs);
+  background: transparent; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ts); transition: background 0.13s, color 0.13s;
 }
-.nc-select:focus { border-color: var(--accent-border); outline: none; }
+.icon-btn:hover { background: var(--bg-hover); color: var(--tp); }
+.icon-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
 
-/* Buttons */
+/* ===================== MAIN ===================== */
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-base); transition: var(--trans); }
+
+.topbar {
+  height: 52px; padding: 0 22px;
+  border-bottom: 1px solid var(--bf);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0; background: var(--bg-surface); transition: var(--trans);
+}
+.topbar-left { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.topbar-hash { font-size: 20px; font-weight: 300; color: var(--tm); line-height: 1; }
+#currentRoom {
+  font-size: 15px; font-weight: 500; color: var(--tp);
+  letter-spacing: -0.02em; font-family: 'Lora', serif;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#modeLabel {
+  font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 99px;
+  background: var(--success-soft); color: var(--success);
+  border: 1px solid rgba(52,211,153,0.25);
+}
+.topbar-right { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+
 .nc-btn {
-  height: 34px; padding: 0 13px;
-  font-size: 12.5px; font-family: inherit; font-weight: 500;
+  height: 32px; padding: 0 12px; font-size: 12.5px;
+  font-family: inherit; font-weight: 500;
   border-radius: var(--radius-sm); border: none; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   white-space: nowrap;
-  transition: opacity 0.15s, transform 0.12s, background 0.15s, box-shadow 0.15s;
+  transition: opacity 0.13s, transform 0.1s, background 0.13s, box-shadow 0.13s;
 }
 .nc-btn:active { transform: scale(0.96); }
+.nc-btn.primary { background: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(91,141,238,0.3); }
+.nc-btn.primary:hover { opacity: 0.9; box-shadow: 0 4px 18px rgba(91,141,238,0.4); transform: translateY(-1px); }
+.nc-btn.ghost { background: var(--bg-input); color: var(--ts); border: 1px solid var(--bs); }
+.nc-btn.ghost:hover { background: var(--bg-hover); color: var(--tp); }
 
-.nc-btn.primary {
-  background: var(--accent); color: #fff;
-  box-shadow: 0 2px 10px rgba(91,141,238,0.3);
-}
-.nc-btn.primary:hover {
-  opacity: 0.92;
-  box-shadow: 0 4px 18px rgba(91,141,238,0.45);
-  transform: translateY(-1px);
-}
+/* Editor */
+.editor-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-.nc-btn.ghost {
-  background: var(--bg-input); color: var(--text-secondary);
-  border: 1px solid var(--border-subtle);
-}
-.nc-btn.ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
-.nc-btn.full { width: 100%; }
-
-/* Sidebar auth */
-.sidebar-auth {
-  padding: 10px 12px 14px; border-top: 1px solid var(--border-faint);
-  display: flex; flex-direction: column; gap: 5px;
-  transition: var(--transition-theme);
-}
-.auth-row { display: flex; gap: 6px; }
-
-/* =====================
-   MAIN
-   ===================== */
-.main {
-  flex: 1; display: flex; flex-direction: column;
-  min-width: 0; background: var(--bg-base);
-  transition: var(--transition-theme);
-}
-
-/* Topbar */
-.topbar {
-  height: 54px; padding: 0 24px;
-  border-bottom: 1px solid var(--border-faint);
-  display: flex; align-items: center; justify-content: space-between;
-  flex-shrink: 0; background: var(--bg-surface);
-  transition: var(--transition-theme);
-}
-.topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.topbar-hash { font-size: 22px; font-weight: 300; color: var(--text-muted); line-height: 1; }
-
-#currentRoom {
-  font-size: 15px; font-weight: 500; color: var(--text-primary);
-  letter-spacing: -0.02em; font-family: 'Lora', serif;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  transition: var(--transition-theme);
-}
-
-#modeLabel {
-  font-size: 11px; font-weight: 500;
-  padding: 3px 9px; border-radius: 99px;
-  background: var(--success-soft); color: var(--success);
-  border: 1px solid rgba(52,211,153,0.25);
-  white-space: nowrap;
-}
-
-.topbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-
-/* Avatar */
-.avatar {
-  width: 32px; height: 32px; border-radius: 50%;
-  background: var(--accent-soft); border: 1.5px solid var(--accent-border);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 500; color: var(--text-accent);
-  flex-shrink: 0; letter-spacing: 0.02em;
-  transition: transform 0.2s;
-}
-.avatar:hover { transform: scale(1.08); }
-
-/* Hamburger (mobile only) */
-.menu-btn {
-  display: none; width: 34px; height: 34px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-input); border: 1px solid var(--border-subtle);
-  cursor: pointer; align-items: center; justify-content: center;
-  flex-shrink: 0; transition: background 0.15s;
-}
-.menu-btn:hover { background: var(--bg-hover); }
-.menu-btn svg { stroke: var(--text-secondary); width: 16px; height: 16px; display: block; }
-
-/* =====================
-   EDITOR AREA
-   ===================== */
-.editor-wrap {
-  flex: 1; display: flex; flex-direction: column;
-  overflow: hidden; position: relative;
-}
-
-/* Toolbar */
 .editor-toolbar {
-  display: flex; align-items: center; gap: 4px;
-  padding: 8px 24px 0;
-  border-bottom: 1px solid var(--border-faint);
-  background: var(--bg-surface);
-  transition: var(--transition-theme);
+  display: flex; align-items: center; gap: 3px;
+  padding: 7px 22px 0; border-bottom: 1px solid var(--bf);
+  background: var(--bg-surface); transition: var(--trans);
 }
-
 .toolbar-btn {
-  height: 28px; min-width: 28px; padding: 0 7px;
+  height: 27px; min-width: 27px; padding: 0 6px;
   border-radius: var(--radius-xs);
   background: transparent; border: none; cursor: pointer;
   font-size: 12px; font-family: inherit; font-weight: 500;
-  color: var(--text-secondary); display: flex; align-items: center; justify-content: center;
+  color: var(--ts); display: flex; align-items: center; justify-content: center;
   transition: background 0.13s, color 0.13s;
 }
-.toolbar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-.toolbar-sep {
-  width: 1px; height: 16px; background: var(--border-subtle);
-  margin: 0 4px; flex-shrink: 0;
-}
+.toolbar-btn:hover { background: var(--bg-hover); color: var(--tp); }
+.toolbar-sep { width: 1px; height: 15px; background: var(--bs); margin: 0 3px; flex-shrink: 0; }
 
 #note {
-  flex: 1; padding: 36px 56px;
-  outline: none; overflow-y: auto;
-  font-size: 15.5px; line-height: 1.9;
-  color: var(--text-primary); white-space: pre-wrap;
-  word-break: break-word; caret-color: var(--accent);
-  font-family: 'DM Sans', sans-serif;
-  transition: padding 0.3s ease, var(--transition-theme);
+  flex: 1; padding: 36px 56px; outline: none; overflow-y: auto;
+  font-size: 15.5px; line-height: 1.9; color: var(--tp);
+  white-space: pre-wrap; word-break: break-word; caret-color: var(--accent);
+  transition: padding 0.3s ease, var(--trans);
 }
 #note::-webkit-scrollbar { width: 4px; }
-#note::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 99px; }
-#note:empty::before {
-  content: attr(data-placeholder);
-  color: var(--text-muted); pointer-events: none; font-style: italic;
-}
+#note::-webkit-scrollbar-thumb { background: var(--bs); border-radius: 99px; }
+#note:empty::before { content: attr(data-placeholder); color: var(--tm); pointer-events: none; font-style: italic; }
 #note:focus { padding: 36px 80px; }
 
-/* =====================
-   STATUS BAR
-   ===================== */
 .statusbar {
-  height: 30px; padding: 0 24px;
-  border-top: 1px solid var(--border-faint);
+  height: 30px; padding: 0 22px;
+  border-top: 1px solid var(--bf);
   display: flex; align-items: center; justify-content: space-between;
-  flex-shrink: 0; background: var(--bg-surface);
-  transition: var(--transition-theme);
+  flex-shrink: 0; background: var(--bg-surface); transition: var(--trans);
 }
-
-#typing {
-  font-size: 12px; color: var(--text-secondary);
-  display: flex; align-items: center; gap: 6px; min-height: 18px;
-}
+#typing { font-size: 12px; color: var(--ts); display: flex; align-items: center; gap: 6px; min-height: 18px; }
 .typing-dots { display: flex; gap: 3px; align-items: center; }
-.typing-dots span {
-  width: 4px; height: 4px; border-radius: 50%;
-  background: var(--accent); animation: typeBounce 0.9s infinite;
-}
+.typing-dots span { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); animation: typeBounce 0.9s infinite; }
 .typing-dots span:nth-child(2) { animation-delay: .15s; }
-.typing-dots span:nth-child(3) { animation-delay: .3s; }
-@keyframes typeBounce {
-  0%,60%,100% { transform: translateY(0); opacity: .4; }
-  30% { transform: translateY(-5px); opacity: 1; }
-}
+.typing-dots span:nth-child(3) { animation-delay: .30s; }
+@keyframes typeBounce { 0%,60%,100%{transform:translateY(0);opacity:.4} 30%{transform:translateY(-5px);opacity:1} }
 
-.status-right { display: flex; align-items: center; gap: 14px; }
-.status-chip {
-  font-size: 11.5px; color: var(--text-muted);
-  display: flex; align-items: center; gap: 4px;
-  transition: var(--transition-theme);
-}
+.status-right { display: flex; align-items: center; gap: 12px; }
+.status-chip { font-size: 11.5px; color: var(--tm); display: flex; align-items: center; gap: 4px; }
 .status-chip svg { width: 11px; height: 11px; stroke: currentColor; fill: none; opacity: 0.7; }
 #saveIndicator { transition: color 0.3s; }
 #saveIndicator.saved { color: var(--success); }
 
-/* =====================
-   EMPTY STATE
-   ===================== */
-.empty-state {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 14px; color: var(--text-muted);
-  animation: fadeIn 0.4s ease;
-}
-@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+/* Empty state */
+.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 13px; color: var(--tm); animation: fadeUp 0.35s ease; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+.empty-icon { width: 52px; height: 52px; border-radius: var(--radius-lg); background: var(--bg-raised); border: 1px solid var(--bs); display: flex; align-items: center; justify-content: center; }
+.empty-icon svg { stroke: var(--tm); width: 22px; height: 22px; }
+.empty-title { font-size: 15px; color: var(--ts); font-family: 'Lora', serif; }
+.empty-sub { font-size: 12.5px; color: var(--tm); }
 
-.empty-icon {
-  width: 52px; height: 52px; border-radius: var(--radius-lg);
-  background: var(--bg-raised); border: 1px solid var(--border-subtle);
+@keyframes slideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+.room-entered { animation: slideUp 0.25s ease; }
+
+/* ===================== MODAL ===================== */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  z-index: 100; display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  backdrop-filter: blur(3px);
+}
+.modal-backdrop.open { opacity: 1; pointer-events: auto; }
+.modal {
+  background: var(--bg-surface); border: 1px solid var(--bs);
+  border-radius: var(--radius-lg); padding: 24px; width: 360px;
+  box-shadow: var(--shadow); transform: scale(0.95);
+  transition: transform 0.2s; transition: var(--trans), transform 0.2s;
+}
+.modal-backdrop.open .modal { transform: scale(1); }
+.modal-title { font-size: 16px; font-weight: 500; color: var(--tp); font-family: 'Lora', serif; margin-bottom: 18px; }
+.modal-field { margin-bottom: 12px; }
+.modal-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--tm); margin-bottom: 6px; }
+.nc-input {
+  width: 100%; height: 36px; padding: 0 12px;
+  font-size: 13px; font-family: inherit; background: var(--bg-input);
+  border: 1px solid var(--bs); border-radius: var(--radius-sm);
+  color: var(--tp); outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+}
+.nc-input::placeholder { color: var(--tm); }
+.nc-input:focus { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-soft); }
+.nc-select {
+  width: 100%; height: 36px; padding: 0 28px 0 12px;
+  font-size: 13px; font-family: inherit; background: var(--bg-input);
+  border: 1px solid var(--bs); border-radius: var(--radius-sm);
+  color: var(--ts); outline: none; cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236b7a8d' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+/* More button on folder/room */
+.more-btn {
+  width: 20px; height: 20px; border-radius: var(--radius-xs);
+  background: transparent; border: none; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
+  color: var(--tm); flex-shrink: 0;
+  opacity: 0; transition: opacity 0.13s, background 0.13s, color 0.13s;
+  font-size: 15px; line-height: 1; padding: 0;
 }
-.empty-icon svg { stroke: var(--text-muted); width: 22px; height: 22px; }
-.empty-title { font-size: 15px; color: var(--text-secondary); font-weight: 400; font-family: 'Lora', serif; }
-.empty-sub { font-size: 12.5px; color: var(--text-muted); }
+.more-btn:hover { background: var(--bs); color: var(--tp); }
+.folder-header:hover .more-btn,
+.room-item:hover .more-btn,
+.more-btn:focus { opacity: 1; }
 
-/* =====================
-   ROOM ENTER ANIMATION
-   ===================== */
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
+/* ===================== CONTEXT MENU ===================== */
+.ctx-menu {
+  position: fixed; z-index: 200;
+  background: var(--bg-surface); border: 1px solid var(--bs);
+  border-radius: var(--radius-md); padding: 4px;
+  box-shadow: var(--shadow); min-width: 160px;
+  opacity: 0; pointer-events: none;
+  transform: scale(0.95); transform-origin: top left;
+  transition: opacity 0.12s, transform 0.12s;
 }
-.room-entered { animation: slideUp 0.28s ease; }
+.ctx-menu.open { opacity: 1; pointer-events: auto; transform: scale(1); }
+.ctx-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: var(--radius-sm);
+  font-size: 13px; color: var(--ts); cursor: pointer;
+  transition: background 0.1s, color 0.1s; user-select: none;
+}
+.ctx-item:hover { background: var(--bg-hover); color: var(--tp); }
+.ctx-item.danger { color: #f87171; }
+.ctx-item.danger:hover { background: rgba(248,113,113,0.1); color: #f87171; }
+.ctx-item svg { width: 13px; height: 13px; stroke: currentColor; fill: none; flex-shrink: 0; }
+.ctx-sep { height: 1px; background: var(--bf); margin: 3px 0; }
 
-/* =====================
-   MOBILE
-   ===================== */
-@media (max-width: 640px) {
+/* ===================== MOBILE ===================== */
+.menu-btn { display: none; width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--bs); cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0; }
+.menu-btn svg { stroke: var(--ts); width: 15px; height: 15px; display: block; }
+
+.sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 40; opacity: 0; pointer-events: none; transition: opacity 0.22s; backdrop-filter: blur(2px); }
+.sidebar-overlay.open { opacity: 1; pointer-events: auto; }
+
+@media (max-width: 700px) {
   .menu-btn { display: flex; }
-
-  .sidebar {
-    position: fixed; top: 0; left: 0; height: 100%; z-index: 50;
-    transform: translateX(-100%);
-    transition: transform 0.24s cubic-bezier(0.4,0,0.2,1);
-    width: 280px; box-shadow: var(--shadow-md);
-  }
-  .sidebar.open { transform: translateX(0); }
-
+  .server-rail, .ch-sidebar, .user-bar { position: fixed; top: 0; left: 0; height: 100%; z-index: 50; transform: translateX(-100%); transition: transform 0.22s cubic-bezier(0.4,0,0.2,1); }
+  .server-rail { width: 60px; }
+  .ch-sidebar { width: 240px; left: 60px; }
+  .user-bar { bottom: 0; top: auto; height: 52px; left: 60px; width: 240px; }
+  .server-rail.open, .ch-sidebar.open, .user-bar.open { transform: translateX(0); }
   .topbar { padding: 0 14px; }
   #note { padding: 20px 18px; }
   #note:focus { padding: 20px 22px; }
-  .editor-toolbar { padding: 8px 14px 0; }
+  .editor-toolbar { padding: 7px 14px 0; }
   .statusbar { padding: 0 14px; }
-  .room { padding: 10px 12px; }
 }
 </style>
 </head>
 <body>
 
+<!-- Overlay -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- Modal: サーバー作成 -->
+<div class="modal-backdrop" id="modalServer">
+  <div class="modal">
+    <div class="modal-title">サーバーを作成</div>
+
+    <!-- アイコンアップロード -->
+    <div class="modal-field" style="text-align:center">
+      <div class="modal-label" style="text-align:left">アイコン画像</div>
+      <div class="icon-upload-area" id="iconUploadArea">
+        <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="3"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+        <span id="iconUploadLabel">クリックしてアップロード</span>
+        <input type="file" id="serverIconFile" accept="image/*">
+      </div>
+      <div class="icon-upload-hint">PNG / JPG / GIF · 推奨 128×128px</div>
+    </div>
+
+    <div class="modal-field">
+      <div class="modal-label">サーバー名</div>
+      <input class="nc-input" id="newServerName" placeholder="例: 開発チーム">
+    </div>
+    <div class="modal-actions">
+      <button class="nc-btn ghost" onclick="closeModal('modalServer')">キャンセル</button>
+      <button class="nc-btn primary" id="createServerBtn">作成</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: フォルダ作成 -->
+<div class="modal-backdrop" id="modalFolder">
+  <div class="modal">
+    <div class="modal-title">フォルダを作成</div>
+    <div class="modal-field">
+      <div class="modal-label">フォルダ名</div>
+      <input class="nc-input" id="newFolderName" placeholder="例: 雑談">
+    </div>
+    <div class="modal-actions">
+      <button class="nc-btn ghost" onclick="closeModal('modalFolder')">キャンセル</button>
+      <button class="nc-btn primary" id="createFolderBtn">作成</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: 部屋作成 -->
+<div class="modal-backdrop" id="modalRoom">
+  <div class="modal">
+    <div class="modal-title">部屋を作成</div>
+    <div class="modal-field">
+      <div class="modal-label">部屋名</div>
+      <input class="nc-input" id="newRoomName" placeholder="例: ゲーム">
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">フォルダ</div>
+      <select class="nc-select" id="newRoomFolder"></select>
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">種別</div>
+      <select class="nc-select" id="newRoomType">
+        <option value="shared">共有ノート</option>
+        <option value="readonly">閲覧専用</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">パスワード（任意）</div>
+      <input class="nc-input" id="newRoomPassword" type="password" placeholder="設定しない場合は空欄">
+    </div>
+    <div class="modal-actions">
+      <button class="nc-btn ghost" onclick="closeModal('modalRoom')">キャンセル</button>
+      <button class="nc-btn primary" id="createRoomBtn">作成</button>
+    </div>
+  </div>
+</div>
 
 <div class="app">
 
-  <!-- ===== SIDEBAR ===== -->
-  <div class="sidebar" id="sidebar">
+  <!-- ===== SERVER RAIL ===== -->
+  <div class="server-rail" id="serverRail">
+    <!-- servers injected here -->
+    <div class="server-divider"></div>
+    <div class="server-add" id="serverAddBtn" title="サーバーを追加">+</div>
+  </div>
 
-    <div class="sidebar-brand">
-      <div class="brand-left">
-        <div class="brand-mark">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-          </svg>
-        </div>
-        <span class="brand-title">NoteCord</span>
-      </div>
-      <button class="theme-toggle" id="themeToggle" aria-label="テーマ切替">
-        <svg id="themeIcon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="5"/>
-          <line x1="12" y1="1" x2="12" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="23"/>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-          <line x1="1" y1="12" x2="3" y2="12"/>
-          <line x1="21" y1="12" x2="23" y2="12"/>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-        </svg>
-      </button>
+  <!-- ===== CHANNEL SIDEBAR ===== -->
+  <div class="ch-sidebar" id="chSidebar">
+    <div class="ch-header" id="chHeader">
+      <span class="ch-server-name" id="chServerName">サーバーを選択</span>
+      <svg class="ch-header-arrow" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
     </div>
-
-    <div class="section-label">ルーム</div>
-    <div id="rooms"></div>
-
-    <div class="sidebar-form">
-      <input class="nc-input" id="roomInput" placeholder="部屋名を入力...">
-      <div class="field-row">
-        <select class="nc-select" id="roomType">
-          <option value="shared">共有ノート</option>
-          <option value="readonly">閲覧専用</option>
-        </select>
-        <button class="nc-btn primary" id="joinBtn">入室</button>
+    <div class="ch-list" id="chList">
+      <div style="padding:20px 10px;text-align:center;color:var(--tm);font-size:12.5px">
+        左からサーバーを選んでください
       </div>
     </div>
+  </div>
 
-    <div class="sidebar-auth">
-      <div class="auth-row">
-        <button class="nc-btn ghost full" id="loginBtn">ログイン</button>
-        <button class="nc-btn ghost full" id="signupBtn">新規登録</button>
-      </div>
-      <button class="nc-btn ghost full" onclick="location.href='/login/github'" style="gap:7px">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+  <!-- ===== USER BAR ===== -->
+  <div class="user-bar" id="userBar">
+    <div class="user-avatar" id="userAvatar">?</div>
+    <div style="flex:1;min-width:0">
+      <div class="user-name" id="userNameDisp">---</div>
+      <div class="user-status">オンライン</div>
+    </div>
+    <div class="user-actions">
+      <button class="icon-btn" id="githubLoginBtn" title="GitHubでログイン">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
           <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
         </svg>
-        GitHub でログイン
+      </button>
+      <button class="icon-btn" id="themeToggle" title="テーマ切替">
+        <svg id="themeIcon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
       </button>
     </div>
   </div>
@@ -551,7 +571,7 @@ html, body {
   <div class="main">
     <div class="topbar">
       <div class="topbar-left">
-        <button class="menu-btn" id="menuBtn" aria-label="メニュー">
+        <button class="menu-btn" id="menuBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="3" y1="6" x2="21" y2="6"/>
             <line x1="3" y1="12" x2="21" y2="12"/>
@@ -563,35 +583,32 @@ html, body {
         <span id="modeLabel" style="display:none"></span>
       </div>
       <div class="topbar-right">
-        <button class="nc-btn ghost" id="inviteBtn" style="font-size:12.5px">
+        <button class="nc-btn ghost" id="inviteBtn">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
           </svg>
           招待
         </button>
-        <div class="avatar" id="userAvatar">?</div>
+        <button class="nc-btn ghost" id="loginBtn">ログイン</button>
+        <button class="nc-btn primary" id="signupBtn">新規登録</button>
       </div>
     </div>
 
-    <!-- Editor -->
-    <div class="editor-wrap" id="editorWrap">
-
-      <!-- Toolbar -->
-      <div class="editor-toolbar" id="editorToolbar">
-        <button class="toolbar-btn" onclick="fmt('bold')" title="太字"><b>B</b></button>
-        <button class="toolbar-btn" onclick="fmt('italic')" title="斜体"><i>I</i></button>
-        <button class="toolbar-btn" onclick="fmt('underline')" title="下線"><u>U</u></button>
+    <div class="editor-wrap">
+      <div class="editor-toolbar">
+        <button class="toolbar-btn" onclick="fmt('bold')"><b>B</b></button>
+        <button class="toolbar-btn" onclick="fmt('italic')"><i>I</i></button>
+        <button class="toolbar-btn" onclick="fmt('underline')"><u>U</u></button>
         <div class="toolbar-sep"></div>
-        <button class="toolbar-btn" onclick="fmtBlock('h2')" title="見出し">H</button>
-        <button class="toolbar-btn" onclick="fmtBlock('p')" title="本文">¶</button>
+        <button class="toolbar-btn" onclick="fmtBlock('h2')">H</button>
+        <button class="toolbar-btn" onclick="fmtBlock('p')">¶</button>
         <div class="toolbar-sep"></div>
-        <button class="toolbar-btn" onclick="fmt('insertUnorderedList')" title="リスト">≡</button>
+        <button class="toolbar-btn" onclick="fmt('insertUnorderedList')">≡</button>
         <div class="toolbar-sep"></div>
-        <button class="toolbar-btn" id="clearBtn" title="クリア" style="margin-left:auto">✕</button>
+        <button class="toolbar-btn" id="clearBtn" style="margin-left:auto">✕</button>
       </div>
 
-      <!-- Empty state (shown when not connected) -->
       <div class="empty-state" id="emptyState">
         <div class="empty-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -599,17 +616,13 @@ html, body {
             <polyline points="14 2 14 8 20 8"/>
           </svg>
         </div>
-        <p class="empty-title">ルームを選択してください</p>
-        <p class="empty-sub">左のサイドバーから入室するとノートが開きます</p>
+        <p class="empty-title">部屋を選択してください</p>
+        <p class="empty-sub">サーバー → フォルダ → 部屋の順に選んでください</p>
       </div>
 
-      <!-- Note editor (hidden until connected) -->
-      <div
-        id="note"
-        contenteditable="false"
-        data-placeholder="ここに書き始めてください..."
-        style="display:none"
-      ></div>
+      <div id="note" contenteditable="false"
+           data-placeholder="ここに書き始めてください..."
+           style="display:none"></div>
     </div>
 
     <div class="statusbar">
@@ -625,12 +638,31 @@ html, body {
       </div>
     </div>
   </div>
+</div>
 
+<!-- Context Menu -->
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-item" id="ctxRename">
+    <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
+    名前を変更
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" id="ctxDelete">
+    <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="3 6 5 6 21 6"/>
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+      <path d="M10 11v6"/><path d="M14 11v6"/>
+      <path d="M9 6V4h6v2"/>
+    </svg>
+    削除
+  </div>
 </div>
 
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
-
 const supabase = createClient(
   "https://qwoasmceczpcvkuufvkt.supabase.co",
   "sb_publishable_U3eBuQImXzRhe7irveKkYQ_cw0RVyem"
@@ -638,15 +670,43 @@ const supabase = createClient(
 
 let ws, isUpdating = false, currentRoomName = "";
 
-/* ===== ユーザー ===== */
+/* ========== STATE (localStorage) ==========
+  servers: [ { id, name, folders: [ { id, name, collapsed, rooms: [ { name, type } ] } ], rootRooms: [ { name, type } ] } ]
+  activeServer: id
+*/
+function loadState() {
+  try { return JSON.parse(localStorage.getItem("nc_state") || "null"); } catch { return null; }
+}
+function saveState(state) {
+  localStorage.setItem("nc_state", JSON.stringify(state));
+}
+
+let state = loadState() || {
+  servers: [
+    {
+      id: "s1", name: "メインサーバー",
+      folders: [
+        { id: "f1", name: "雑談", collapsed: false,
+          rooms: [{ name: "general", type: "shared" }, { name: "ゲーム", type: "shared" }] },
+        { id: "f2", name: "作業", collapsed: false,
+          rooms: [{ name: "議事録", type: "shared" }, { name: "アイデア", type: "readonly" }] }
+      ],
+      rootRooms: [{ name: "お知らせ", type: "readonly" }]
+    }
+  ],
+  activeServer: "s1"
+};
+
+/* ===== USER ===== */
 let username = localStorage.getItem("notecord_username");
 if (!username) {
   username = prompt("ユーザー名を入力してください") || ("User" + Math.floor(Math.random() * 1000));
   localStorage.setItem("notecord_username", username);
 }
 document.getElementById("userAvatar").textContent = username.slice(0, 2);
+document.getElementById("userNameDisp").textContent = username;
 
-/* ===== テーマ ===== */
+/* ===== THEME ===== */
 const html = document.documentElement;
 const savedTheme = localStorage.getItem("notecord_theme") || "dark";
 html.setAttribute("data-theme", savedTheme);
@@ -661,205 +721,494 @@ document.getElementById("themeToggle").addEventListener("click", () => {
 
 function updateThemeIcon(theme) {
   const icon = document.getElementById("themeIcon");
-  if (theme === "dark") {
-    icon.innerHTML = `
-      <circle cx="12" cy="12" r="5"/>
-      <line x1="12" y1="1" x2="12" y2="3"/>
-      <line x1="12" y1="21" x2="12" y2="23"/>
-      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-      <line x1="1" y1="12" x2="3" y2="12"/>
-      <line x1="21" y1="12" x2="23" y2="12"/>
-      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-    `;
-  } else {
-    icon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
-  }
+  icon.innerHTML = theme === "dark"
+    ? `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`
+    : `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
 }
 
-/* ===== モバイル ドロワー ===== */
-const sidebar = document.getElementById("sidebar");
-const overlay = document.getElementById("sidebarOverlay");
-const menuBtn = document.getElementById("menuBtn");
+/* ===== MOBILE DRAWER ===== */
+const overlay   = document.getElementById("sidebarOverlay");
+const serverRail= document.getElementById("serverRail");
+const chSidebar = document.getElementById("chSidebar");
+const userBar   = document.getElementById("userBar");
+const menuBtn   = document.getElementById("menuBtn");
 
-function openSidebar()  { sidebar.classList.add("open"); overlay.classList.add("open"); }
-function closeSidebar() { sidebar.classList.remove("open"); overlay.classList.remove("open"); }
+function openDrawer()  { [serverRail, chSidebar, userBar, overlay].forEach(el => el.classList.add("open")); }
+function closeDrawer() { [serverRail, chSidebar, userBar, overlay].forEach(el => el.classList.remove("open")); }
+menuBtn.addEventListener("click", openDrawer);
+overlay.addEventListener("click", closeDrawer);
 
-menuBtn.addEventListener("click", openSidebar);
-overlay.addEventListener("click", closeSidebar);
+/* ===== MODAL ===== */
+window.closeModal = (id) => {
+  document.getElementById(id).classList.remove("open");
+  // モーダルを閉じたときアップロードプレビューをリセット
+  if (id === "modalServer") resetIconUpload();
+};
+function openModal(id) { document.getElementById(id).classList.add("open"); }
 
-/* ===== Auth ===== */
-async function loginEmail() {
-  const email = prompt("メールアドレス");
-  const password = prompt("パスワード");
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return alert(error.message);
-  localStorage.setItem("sb_token", data.session.access_token);
-  alert("ログイン成功");
+/* ===== SERVER ICON UPLOAD ===== */
+let pendingIconDataUrl = null;
+
+function resetIconUpload() {
+  pendingIconDataUrl = null;
+  const area = document.getElementById("iconUploadArea");
+  // 既存の img を除去
+  area.querySelectorAll("img").forEach(el => el.remove());
+  document.getElementById("iconUploadLabel").style.display = "";
+  area.querySelector("svg").style.display = "";
+  document.getElementById("serverIconFile").value = "";
 }
 
-async function signupEmail() {
-  const email = prompt("メールアドレス");
-  const password = prompt("パスワード");
-  const { error } = await supabase.auth.signUp({ email, password });
-  if (error) alert(error.message);
-  else alert("メール確認をしてください");
+document.getElementById("serverIconFile").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    pendingIconDataUrl = ev.target.result;
+    const area = document.getElementById("iconUploadArea");
+    // remove old preview img
+    area.querySelectorAll("img").forEach(el => el.remove());
+    const img = document.createElement("img");
+    img.src = pendingIconDataUrl;
+    area.appendChild(img);
+    // hide placeholder elements
+    document.getElementById("iconUploadLabel").style.display = "none";
+    area.querySelector("svg").style.display = "none";
+  };
+  reader.readAsDataURL(file);
+});
+
+/* ===== RENDER SERVERS ===== */
+function renderServers() {
+  const rail = document.getElementById("serverRail");
+  [...rail.querySelectorAll(".server-icon")].forEach(el => el.remove());
+  const divider = rail.querySelector(".server-divider");
+
+  state.servers.forEach(srv => {
+    const el = document.createElement("div");
+    el.className = "server-icon" + (srv.id === state.activeServer ? " active" : "");
+    el.title = srv.name;
+
+    if (srv.icon) {
+      // 画像アイコン
+      const img = document.createElement("img");
+      img.src = srv.icon;
+      img.alt = srv.name;
+      el.appendChild(img);
+    } else {
+      // イニシャルフォールバック
+      el.textContent = srv.name.slice(0, 2).toUpperCase();
+    }
+
+    el.onclick = () => { state.activeServer = srv.id; saveState(state); renderServers(); renderChannels(); };
+    rail.insertBefore(el, divider);
+  });
 }
 
-/* ===== Rooms ===== */
-async function loadRooms() {
-  try {
-    const res = await fetch("/rooms");
-    const rooms = await res.json();
-    const container = document.getElementById("rooms");
-    container.innerHTML = "";
-    const colors = ["green", "blue", "amber"];
-    rooms.forEach(room => {
-      const div = document.createElement("div");
-      div.className = "room" + (room.name === currentRoomName ? " active" : "");
-      const color = colors[Math.floor(Math.random() * colors.length)];
-      const isShared = room.label === "共有";
-      div.innerHTML = `
-        <div class="room-dot ${color}"></div>
-        <span class="room-name">${room.name}</span>
-        <span class="room-pill ${isShared ? "shared" : "readonly"}">${room.label}</span>
-      `;
-      div.onclick = () => {
-        document.getElementById("roomInput").value = room.name;
-        accessRoom();
-      };
-      container.appendChild(div);
+/* ===== RENDER CHANNELS ===== */
+function renderChannels() {
+  const srv = state.servers.find(s => s.id === state.activeServer);
+  if (!srv) return;
+
+  document.getElementById("chServerName").textContent = srv.name;
+  const list = document.getElementById("chList");
+  list.innerHTML = "";
+
+  // Root rooms
+  if (srv.rootRooms && srv.rootRooms.length > 0) {
+    const rootDiv = document.createElement("div");
+    rootDiv.className = "root-rooms";
+    srv.rootRooms.forEach(room => {
+      rootDiv.appendChild(makeRoomItem(room, null));
     });
-  } catch(e) { /* サーバー未起動時は無視 */ }
+    list.appendChild(rootDiv);
+  }
+
+  // Folders
+  srv.folders.forEach(folder => {
+    const folderEl = document.createElement("div");
+    folderEl.className = "folder" + (folder.collapsed ? " collapsed" : "");
+
+    folderEl.innerHTML = `
+      <div class="folder-header">
+        <svg class="folder-chevron" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+        <span class="folder-name">${folder.name}</span>
+        <button class="more-btn folder-more" title="フォルダのオプション">⋯</button>
+        <svg class="folder-add" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </div>
+      <div class="folder-rooms"></div>
+    `;
+
+    // toggle collapse
+    folderEl.querySelector(".folder-header").addEventListener("click", (e) => {
+      if (e.target.closest(".folder-add") || e.target.closest(".folder-more")) return;
+      folder.collapsed = !folder.collapsed;
+      saveState(state);
+      folderEl.classList.toggle("collapsed", folder.collapsed);
+    });
+
+    // ⋯ more button on folder
+    folderEl.querySelector(".folder-more").addEventListener("click", (e) => {
+      e.stopPropagation();
+      showCtxMenu(e, "folder", { folder });
+    });
+
+    // right-click on folder header (keep as fallback)
+    folderEl.querySelector(".folder-header").addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      showCtxMenu(e, "folder", { folder });
+    });
+
+    // add room to folder
+    folderEl.querySelector(".folder-add").addEventListener("click", (e) => {
+      e.stopPropagation();
+      openRoomModal(folder.id);
+    });
+
+    const roomsContainer = folderEl.querySelector(".folder-rooms");
+    folder.rooms.forEach(room => {
+      roomsContainer.appendChild(makeRoomItem(room, folder.id));
+    });
+
+    list.appendChild(folderEl);
+  });
+
+  // Add folder button
+  const addFolderBtn = document.createElement("button");
+  addFolderBtn.className = "nc-btn ghost";
+  addFolderBtn.style.cssText = "width:calc(100% - 12px);margin:8px 6px;font-size:12px;height:30px;";
+  addFolderBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> フォルダを追加`;
+  addFolderBtn.onclick = () => openModal("modalFolder");
+  list.appendChild(addFolderBtn);
 }
 
-/* ===== Join ===== */
-async function accessRoom() {
-  const room = document.getElementById("roomInput").value.trim();
-  const type = document.getElementById("roomType").value;
-  if (!room) return alert("部屋名を入力してください");
-  const password = prompt("パスワード（不要な場合は空欄）") || "";
+function makeRoomItem(room, folderId) {
+  const el = document.createElement("div");
+  el.className = "room-item" + (room.name === currentRoomName ? " active" : "");
+  const isShared = room.type === "shared";
+  el.innerHTML = `
+    <span class="room-hash">#</span>
+    <span class="room-item-name">${room.name}</span>
+    <span class="room-item-badge ${isShared ? "shared" : "readonly"}">${isShared ? "共有" : "閲覧"}</span>
+    <button class="more-btn room-more" title="部屋のオプション">⋯</button>
+  `;
+  el.addEventListener("click", (e) => {
+    if (e.target.closest(".room-more")) return;
+    joinRoom(room); closeDrawer();
+  });
+  el.querySelector(".room-more").addEventListener("click", (e) => {
+    e.stopPropagation();
+    showCtxMenu(e, "room", { room, folderId });
+  });
+  el.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    showCtxMenu(e, "room", { room, folderId });
+  });
+  return el;
+}
+
+/* ===== CREATE SERVER ===== */
+document.getElementById("serverAddBtn").addEventListener("click", () => openModal("modalServer"));
+document.getElementById("createServerBtn").addEventListener("click", () => {
+  const name = document.getElementById("newServerName").value.trim();
+  if (!name) return;
+  const id = "s" + Date.now();
+  state.servers.push({
+    id, name,
+    icon: pendingIconDataUrl || null,
+    folders: [], rootRooms: []
+  });
+  state.activeServer = id;
+  saveState(state);
+  document.getElementById("newServerName").value = "";
+  resetIconUpload();
+  closeModal("modalServer");
+  renderServers();
+  renderChannels();
+});
+
+/* ===== CREATE FOLDER ===== */
+document.getElementById("createFolderBtn").addEventListener("click", () => {
+  const name = document.getElementById("newFolderName").value.trim();
+  if (!name) return;
+  const srv = state.servers.find(s => s.id === state.activeServer);
+  if (!srv) return;
+  srv.folders.push({ id: "f" + Date.now(), name, collapsed: false, rooms: [] });
+  saveState(state);
+  document.getElementById("newFolderName").value = "";
+  closeModal("modalFolder");
+  renderChannels();
+});
+
+/* ===== CREATE ROOM ===== */
+let targetFolderId = null;
+
+function openRoomModal(folderId = null) {
+  targetFolderId = folderId;
+  const srv = state.servers.find(s => s.id === state.activeServer);
+  const sel = document.getElementById("newRoomFolder");
+  sel.innerHTML = `<option value="">フォルダなし（直下）</option>`;
+  if (srv) {
+    srv.folders.forEach(f => {
+      const opt = document.createElement("option");
+      opt.value = f.id; opt.textContent = f.name;
+      if (f.id === folderId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+  openModal("modalRoom");
+}
+
+// + ボタンをトップバーに
+document.getElementById("inviteBtn").insertAdjacentHTML("beforebegin", `
+  <button class="nc-btn ghost" id="addRoomTopBtn">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    部屋を作成
+  </button>
+`);
+document.getElementById("addRoomTopBtn").addEventListener("click", () => openRoomModal(null));
+
+document.getElementById("createRoomBtn").addEventListener("click", () => {
+  const name     = document.getElementById("newRoomName").value.trim();
+  const folderId = document.getElementById("newRoomFolder").value;
+  const type     = document.getElementById("newRoomType").value;
+  const password = document.getElementById("newRoomPassword").value.trim();
+  if (!name) return;
+
+  const srv = state.servers.find(s => s.id === state.activeServer);
+  if (!srv) return;
+
+  const room = { name, type, password: password || "" };
+  if (folderId) {
+    const folder = srv.folders.find(f => f.id === folderId);
+    if (folder) folder.rooms.push(room);
+  } else {
+    srv.rootRooms = srv.rootRooms || [];
+    srv.rootRooms.push(room);
+  }
+
+  saveState(state);
+  document.getElementById("newRoomName").value = "";
+  document.getElementById("newRoomPassword").value = "";
+  closeModal("modalRoom");
+  renderChannels();
+});
+
+/* ===== JOIN ROOM ===== */
+async function joinRoom(room) {
+  let password = "";
+  if (room.password) {
+    password = prompt(`「${room.name}」のパスワードを入力`) || "";
+    if (password !== room.password) return alert("パスワードが違います");
+  }
+
+  // サーバーがあれば /join-room を叩く、なければローカルで接続
   try {
     const res = await fetch("/join-room", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ room, password, room_type: type, username })
+      body: JSON.stringify({ room: room.name, password, room_type: room.type, username })
     });
     const result = await res.json();
     if (!result.success) return alert(result.message);
-    connectRoom(room, result.can_edit, result.label);
-    closeSidebar();
-    loadRooms();
-  } catch(e) { alert("接続に失敗しました"); }
+    connectRoom(room.name, result.can_edit, result.label);
+  } catch {
+    // サーバーなし → ローカルモードで開く
+    const canEdit = room.type !== "readonly";
+    connectRoom(room.name, canEdit, room.type === "shared" ? "共有" : "閲覧専用");
+  }
+  renderChannels();
 }
 
-/* ===== Connect ===== */
+/* ===== CONNECT ===== */
 function connectRoom(room, canEdit, label) {
   currentRoomName = room;
   document.getElementById("currentRoom").textContent = room;
   const modeEl = document.getElementById("modeLabel");
-  modeEl.textContent = label;
-  modeEl.style.display = "inline";
+  modeEl.textContent = label; modeEl.style.display = "inline";
 
-  /* エディタ表示切替 */
   const emptyState = document.getElementById("emptyState");
   const note = document.getElementById("note");
   emptyState.style.display = "none";
   note.style.display = "block";
   note.classList.add("room-entered");
   note.addEventListener("animationend", () => note.classList.remove("room-entered"), { once: true });
-
   note.contentEditable = canEdit ? "true" : "false";
 
-  if (ws) ws.close();
-  ws = new WebSocket(
-    (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/" + room
-  );
+  // ローカル保存のノートを読み込む（サーバーなし時のフォールバック）
+  const localKey = "nc_note_" + room;
+  const saved = localStorage.getItem(localKey);
+  if (saved) { isUpdating = true; note.innerText = saved; updateCharCount(saved); isUpdating = false; }
+  else { note.innerText = ""; updateCharCount(""); }
 
-  ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    if (data.type === "init" || data.type === "update") {
-      isUpdating = true;
-      note.innerText = data.text;
-      updateCharCount(note.innerText);
-      isUpdating = false;
-    }
-    if (data.type === "typing") {
-      const el = document.getElementById("typing");
-      el.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div>${data.user} が入力中`;
-      clearTimeout(el._t);
-      el._t = setTimeout(() => { el.innerHTML = ""; }, 1500);
-    }
-  };
+  if (ws) ws.close();
+  ws = null;
+
+  // WebSocket接続を試みる（サーバーがあれば上書き）
+  try {
+    const sock = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/" + room);
+    sock.onopen = () => { ws = sock; };
+    sock.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "init" || data.type === "update") {
+        isUpdating = true; note.innerText = data.text; updateCharCount(note.innerText);
+        localStorage.setItem(localKey, data.text);
+        isUpdating = false;
+      }
+      if (data.type === "typing") {
+        const el = document.getElementById("typing");
+        el.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div>${data.user} が入力中`;
+        clearTimeout(el._t); el._t = setTimeout(() => { el.innerHTML = ""; }, 1500);
+      }
+    };
+    sock.onerror = () => {}; // サーバーなし時は無視
+  } catch {}
 
   note.oninput = () => {
-    if (!canEdit || isUpdating || ws.readyState !== WebSocket.OPEN) return;
-    ws.send(JSON.stringify({ type: "update", text: note.innerText }));
-    ws.send(JSON.stringify({ type: "typing", user: username }));
+    if (!canEdit || isUpdating) return;
     updateCharCount(note.innerText);
     setSaveState("saving");
     clearTimeout(note._saveTimer);
+    // ローカルに常時保存
+    localStorage.setItem(localKey, note.innerText);
     note._saveTimer = setTimeout(() => setSaveState("saved"), 800);
+    // サーバーがあればWebSocketにも送信
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "update", text: note.innerText }));
+      ws.send(JSON.stringify({ type: "typing", user: username }));
+    }
   };
 }
 
-/* ===== Editor helpers ===== */
+/* ===== EDITOR HELPERS ===== */
 function updateCharCount(text) {
-  const count = text.replace(/\s/g, "").length;
-  document.getElementById("charCount").textContent = count.toLocaleString() + " 文字";
+  document.getElementById("charCount").textContent = text.replace(/\s/g, "").length.toLocaleString() + " 文字";
 }
-
 function setSaveState(state) {
   const el = document.getElementById("saveIndicator");
-  if (state === "saving") {
-    el.textContent = "保存中...";
-    el.classList.remove("saved");
-  } else {
-    el.innerHTML = `
-      <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;stroke:currentColor;fill:none">
-        <polyline points="20 6 9 17 4 12"/>
-      </svg>
-      保存済み
-    `;
+  if (state === "saving") { el.textContent = "保存中..."; el.classList.remove("saved"); }
+  else {
+    el.innerHTML = `<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;stroke:currentColor;fill:none"><polyline points="20 6 9 17 4 12"/></svg> 保存済み`;
     el.classList.add("saved");
   }
 }
-
-/* ===== Toolbar ===== */
 window.fmt = (cmd) => document.execCommand(cmd, false, null);
 window.fmtBlock = (tag) => document.execCommand("formatBlock", false, tag);
-
 document.getElementById("clearBtn").addEventListener("click", () => {
   const note = document.getElementById("note");
-  if (note.innerText.trim() && confirm("内容をクリアしますか？")) {
-    note.innerText = "";
-    updateCharCount("");
-  }
+  if (note.innerText.trim() && confirm("内容をクリアしますか？")) { note.innerText = ""; updateCharCount(""); }
 });
 
-/* ===== Invite ===== */
-function copyInviteLink() {
-  if (!currentRoomName) return alert("ルームに接続していません");
-  navigator.clipboard.writeText(location.origin + "/?room=" + currentRoomName)
-    .then(() => alert("招待リンクをコピーしました"))
-    .catch(() => alert("コピーに失敗しました"));
+/* ===== AUTH ===== */
+async function loginEmail() {
+  const email = prompt("メールアドレス"), password = prompt("パスワード");
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return alert(error.message);
+  localStorage.setItem("sb_token", data.session.access_token);
+  alert("ログイン成功");
 }
-
-/* ===== Init ===== */
-document.getElementById("joinBtn").addEventListener("click", accessRoom);
+async function signupEmail() {
+  const email = prompt("メールアドレス"), password = prompt("パスワード");
+  const { error } = await supabase.auth.signUp({ email, password });
+  if (error) alert(error.message); else alert("メール確認をしてください");
+}
 document.getElementById("loginBtn").addEventListener("click", loginEmail);
 document.getElementById("signupBtn").addEventListener("click", signupEmail);
-document.getElementById("inviteBtn").addEventListener("click", copyInviteLink);
+document.getElementById("githubLoginBtn").addEventListener("click", () => { location.href = "/login/github"; });
+document.getElementById("inviteBtn").addEventListener("click", () => {
+  if (!currentRoomName) return alert("部屋に接続していません");
+  navigator.clipboard.writeText(location.origin + "/?room=" + currentRoomName)
+    .then(() => alert("招待リンクをコピーしました")).catch(() => alert("コピーに失敗しました"));
+});
 
-await loadRooms();
+/* ===== CONTEXT MENU ===== */
+const ctxMenu = document.getElementById("ctxMenu");
+let ctxTarget = null; // { type: "room"|"folder", room?, folderId?, folder? }
+
+function showCtxMenu(e, type, data) {
+  ctxTarget = { type, ...data };
+  const x = Math.min(e.clientX, window.innerWidth - 180);
+  const y = Math.min(e.clientY, window.innerHeight - 90);
+  ctxMenu.style.left = x + "px";
+  ctxMenu.style.top  = y + "px";
+  ctxMenu.classList.add("open");
+}
+
+function hideCtxMenu() { ctxMenu.classList.remove("open"); ctxTarget = null; }
+
+document.addEventListener("mousedown", (e) => {
+  if (ctxMenu.classList.contains("open") && !ctxMenu.contains(e.target)) hideCtxMenu();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideCtxMenu(); });
+
+document.getElementById("ctxRename").addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (!ctxTarget) return;
+  const srv = state.servers.find(s => s.id === state.activeServer);
+  if (!srv) return;
+
+  if (ctxTarget.type === "folder") {
+    const newName = prompt("新しいフォルダ名", ctxTarget.folder.name);
+    if (!newName || !newName.trim()) return;
+    ctxTarget.folder.name = newName.trim();
+    saveState(state); renderChannels();
+
+  } else if (ctxTarget.type === "room") {
+    const newName = prompt("新しい部屋名", ctxTarget.room.name);
+    if (!newName || !newName.trim()) return;
+    const oldName = ctxTarget.room.name;
+    ctxTarget.room.name = newName.trim();
+    if (currentRoomName === oldName) {
+      currentRoomName = newName.trim();
+      document.getElementById("currentRoom").textContent = newName.trim();
+    }
+    saveState(state); renderChannels();
+  }
+  hideCtxMenu();
+});
+
+document.getElementById("ctxDelete").addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (!ctxTarget) return;
+  const srv = state.servers.find(s => s.id === state.activeServer);
+  if (!srv) return;
+
+  if (ctxTarget.type === "folder") {
+    if (!confirm(`「${ctxTarget.folder.name}」フォルダを削除しますか？\n中の部屋もすべて削除されます。`)) return;
+    srv.folders = srv.folders.filter(f => f.id !== ctxTarget.folder.id);
+    saveState(state); renderChannels();
+
+  } else if (ctxTarget.type === "room") {
+    if (!confirm(`「${ctxTarget.room.name}」を削除しますか？`)) return;
+    if (ctxTarget.folderId) {
+      const folder = srv.folders.find(f => f.id === ctxTarget.folderId);
+      if (folder) folder.rooms = folder.rooms.filter(r => r !== ctxTarget.room);
+    } else {
+      srv.rootRooms = srv.rootRooms.filter(r => r !== ctxTarget.room);
+    }
+    if (currentRoomName === ctxTarget.room.name) {
+      currentRoomName = "";
+      document.getElementById("currentRoom").textContent = "未接続";
+      document.getElementById("modeLabel").style.display = "none";
+      document.getElementById("emptyState").style.display = "";
+      document.getElementById("note").style.display = "none";
+    }
+    saveState(state); renderChannels();
+  }
+  hideCtxMenu();
+});
+
+/* ===== INIT ===== */
+renderServers();
+renderChannels();
 
 const params = new URLSearchParams(location.search);
 const room = params.get("room");
-if (room) {
-  document.getElementById("roomInput").value = room;
-  accessRoom();
-}
+if (room) joinRoom(room, "shared");
 </script>
 </body>
 </html>
